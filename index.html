@@ -106,7 +106,16 @@ nav{
 }
 .bar-btn:hover{background:rgba(79,124,255,0.25)}
 
-/* SECTIONS */
+/* ──────────── TERRAIN BG ──────────── */
+#bgCanvas{
+  position:fixed;top:0;left:0;
+  width:100%;height:100%;
+  z-index:-1;pointer-events:none;
+}
+#bgCanvas ~ canvas{
+  position:fixed;top:0;left:0;
+  pointer-events:none;z-index:-1;
+}
 section{padding:calc(var(--nav-h)+4rem) 2.5rem 5rem;max-width:1100px;margin:0 auto;position:relative;z-index:1}
 section:not(:first-child){padding-top:5rem}
 #works{padding-bottom:62px}
@@ -118,17 +127,7 @@ section:not(:first-child){padding-top:5rem}
   padding-top:var(--nav-h);
   position:relative;
 }
-#globeCanvas{
-  position:absolute;
-  right:-200px;
-  top:50%;
-  transform:translateY(-50%);
-  width:780px;
-  height:780px;
-  pointer-events:none;
-  opacity:0.92;
-  z-index:0;
-}
+
 .folder-wrap{
   width:calc(100% - 496px);
   min-width:480px;
@@ -499,7 +498,7 @@ textarea{resize:vertical;min-height:80px}
 .lightbox-close:hover{color:var(--text);border-color:rgba(255,255,255,0.2)}
 
 /* ──────────── MODALS ──────────── */
-.modal-overlay{position:fixed;inset:0;z-index:500;background:rgba(4,5,10,0.88);display:none;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)}
+.modal-overlay{position:fixed;inset:0;z-index:9999;background:rgba(4,5,10,0.88);display:none;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)}
 .modal-overlay.open{display:flex}
 .modal{
   background:var(--panel);border:1px solid var(--border-hi);
@@ -556,7 +555,7 @@ textarea{resize:vertical;min-height:80px}
 /* FOOTER */
 footer{
   text-align:center;padding:2rem;font-size:0.75rem;color:var(--muted);
-  border-top:1px solid var(--border);position:relative;z-index:1;
+  border-top:1px solid var(--border);position:relative;z-index:10;
   font-family:'JetBrains Mono',monospace;letter-spacing:0.04em;
 }
 .footer-admin-btn{
@@ -639,12 +638,11 @@ footer{
   nav{padding:0 1.25rem}
   .nav-links{display:none}
   .hamburger{display:flex}
-
+  
   /* Sections */
   section{padding-left:1.25rem;padding-right:1.25rem}
 
   /* Globe — hide on mobile */
-  #globeCanvas{display:none}
 
   /* Hero folder — full width */
   #hero{padding-top:var(--nav-h);min-height:auto;padding-bottom:3rem}
@@ -687,8 +685,11 @@ footer{
 </head>
 <body>
 
-<!-- STARS -->
-<div class="stars" id="stars"></div>
+<!-- TERRAIN BG -->
+<canvas id="bgCanvas"></canvas>
+
+<!-- STARS (keep for compatibility) -->
+<div class="stars" id="stars" style="display:none"></div>
 
 <!-- NAV -->
 <nav>
@@ -724,7 +725,6 @@ footer{
 
 <!-- ═══ HERO ═══ -->
 <section id="hero">
-  <canvas id="globeCanvas"></canvas>
   <div class="folder-wrap">
     <div class="folder-tab animate__animated animate__bounceInDown">
       <span class="folder-tab-dot dot-red"></span>
@@ -761,10 +761,8 @@ footer{
   </div>
 </section>
 
-<hr class="cosmic-divider">
-
 <!-- ═══ ABOUT ═══ -->
-<section id="about" style="padding:0;max-width:100%">
+<section id="about" style="padding:0;max-width:100%;background:rgba(0,0,0,0.3);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:none">
   <div class="about-inner">
     <div class="about-photo-wrap reveal-left">
       <div class="about-glow"></div>
@@ -787,8 +785,6 @@ footer{
     </div>
   </div>
 </section>
-
-<hr class="cosmic-divider">
 
 <!-- ABOUT FULL PAGE -->
 <div id="aboutPage" style="display:none;position:fixed;inset:0;z-index:300;background:var(--space);overflow-y:auto">
@@ -916,9 +912,10 @@ footer{
 <!-- FOOTER -->
 <footer>
   <div>© NINA Portfolio &nbsp;·&nbsp; All rights reserved</div>
-  <div style="margin-top:0.5rem">
+  <div style="margin-top:0.5rem;display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap">
     <button class="footer-admin-btn" onclick="openLogin()" id="footerLoginBtn">🔑 Backend</button>
     <button class="footer-admin-btn" onclick="openAdminPanel()" id="footerAdminBtn" style="display:none">⚙ Dashboard</button>
+    <button class="footer-admin-btn" onclick="logout()" id="footerLogoutBtn" style="display:none;color:var(--danger);border-color:rgba(224,85,85,0.3)">登出</button>
   </div>
 </footer>
 
@@ -1147,7 +1144,6 @@ function makeStars(){
 
 // ─── Init ───
 function init(){
-  makeStars();
   try{works=JSON.parse(localStorage.getItem(WORKS_KEY))||[];}catch{works=[];}
   try{about={...ABOUT_DEF,...JSON.parse(localStorage.getItem(ABOUT_KEY))};}catch{about={...ABOUT_DEF};}
   try{hero={...HERO_DEF,...JSON.parse(localStorage.getItem(HERO_KEY))};}catch{hero={...HERO_DEF};}
@@ -1325,13 +1321,21 @@ function saveAboutSections(){
 function applyAdminUI(){
   document.getElementById('adminBar').classList.toggle('show',isAdmin);
   document.getElementById('adminPill').classList.toggle('show',isAdmin);
-  document.getElementById('addBtn').style.display=isAdmin?'inline-flex':'none';
-  document.getElementById('addUiuxBtn').style.display=isAdmin?'inline-flex':'none';
-  document.getElementById('saveBtn').style.display=isAdmin?'inline-flex':'none';
-  document.getElementById('saveBtn2').style.display=isAdmin?'inline-flex':'none';
-  document.getElementById('footerLoginBtn').style.display=isAdmin?'none':'';
-  document.getElementById('footerAdminBtn').style.display=isAdmin?'':'none';
-  document.querySelectorAll('.card-admin-row').forEach(el=>el.classList.toggle('show',isAdmin));
+  // 首頁完全不顯示新增/SAVE 按鈕
+  document.getElementById('addBtn').style.display='none';
+  document.getElementById('addUiuxBtn').style.display='none';
+  document.getElementById('saveBtn').style.display='none';
+  document.getElementById('saveBtn2').style.display='none';
+  // Nav 按鈕
+  document.getElementById('navLoginBtn') && (document.getElementById('navLoginBtn').style.display=isAdmin?'none':'');
+  document.getElementById('navDashBtn') && (document.getElementById('navDashBtn').style.display=isAdmin?'':'none');
+  document.getElementById('navLogoutBtn') && (document.getElementById('navLogoutBtn').style.display=isAdmin?'':'none');
+  // Footer 按鈕
+  document.getElementById('footerLoginBtn').style.display=isAdmin?'none':'inline-flex';
+  document.getElementById('footerAdminBtn').style.display=isAdmin?'inline-flex':'none';
+  document.getElementById('footerLogoutBtn').style.display=isAdmin?'inline-flex':'none';
+  // 卡片刪除按鈕隱藏
+  document.querySelectorAll('.card-admin-row').forEach(el=>el.classList.remove('show'));
 }
 
 // ─── Auth ───
@@ -1822,9 +1826,13 @@ function renderAdminWorks(){
   const el=document.getElementById('apWorksList');
   if(!works.length){el.innerHTML='<p style="padding:1.25rem 1.5rem;font-size:0.82rem;color:var(--muted)">尚無作品</p>';return;}
   const allCats=['平面設計','包裝設計','LOGO','攝影','UI/UX','網頁設計','其他'];
-  el.innerHTML=`<table class="works-table">
-    <thead><tr><th>縮圖</th><th>名稱</th><th>類別</th><th></th></tr></thead>
-    <tbody>${works.map(w=>`
+  const mwCats=['平面設計','包裝設計','LOGO','攝影','其他'];
+  const prCats=['UI/UX','網頁設計'];
+  const myWork=works.filter(w=>mwCats.includes(w.category));
+  const projects=works.filter(w=>prCats.includes(w.category));
+
+  function tableRows(list){
+    return list.map(w=>`
       <tr id="row-${w.id}">
         <td>${w.img?`<img src="${w.img}" alt="">`:'<div style="width:52px;height:38px;background:var(--dim);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:1rem">✦</div>'}</td>
         <td style="font-weight:500">${w.title}</td>
@@ -1880,9 +1888,24 @@ function renderAdminWorks(){
             </div>
           </div>
         </td>
-      </tr>`).join('')}
-    </tbody>
-  </table>`;
+      </tr>`).join('');
+  }
+
+  el.innerHTML=`
+    <div style="padding:0.75rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--accent);letter-spacing:0.1em">// MY WORK</span>
+      <span style="font-size:0.72rem;color:var(--muted)">${myWork.length} 件</span>
+    </div>
+    ${myWork.length?`<table class="works-table"><thead><tr><th>縮圖</th><th>名稱</th><th>類別</th><th></th></tr></thead><tbody>${tableRows(myWork)}</tbody></table>`
+    :`<p style="padding:1rem 1.5rem;font-size:0.82rem;color:var(--muted)">尚無作品</p>`}
+
+    <div style="padding:0.75rem 1.5rem;border-top:2px solid var(--border);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin-top:0.5rem">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--accent2);letter-spacing:0.1em">// PROJECTS</span>
+      <span style="font-size:0.72rem;color:var(--muted)">${projects.length} 件</span>
+    </div>
+    ${projects.length?`<table class="works-table"><thead><tr><th>縮圖</th><th>名稱</th><th>類別</th><th></th></tr></thead><tbody>${tableRows(projects)}</tbody></table>`
+    :`<p style="padding:1rem 1.5rem;font-size:0.82rem;color:var(--muted)">尚無作品</p>`}
+  `;
 }
 
 function openEditRow(id){
@@ -2178,67 +2201,49 @@ function saveToLocal(){
   doSave();
 }
 
-// ─── Export HTML for GitHub Pages ───
-
+// ─── Export HTML ───
 async function exportHTML(){
   showToast('準備下載中...');
+  try{
+    // 抓原始 HTML（不含動態 DOM 如 terrain canvas）
+    const res = await fetch(location.href);
+    let html = await res.text();
 
-  // 暫時切換到訪客狀態，讓 DOM 是乾淨前台
-  const wasAdmin = isAdmin;
-  isAdmin = false;
-  applyAdminUI();
-  document.getElementById('adminPanel').classList.remove('open');
-  document.body.style.overflow = '';
+    // 移除舊嵌入資料
+    html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>\n?/g, '');
 
-  await new Promise(r => setTimeout(r, 200));
+    // 嵌入最新資料
+    const worksJson = JSON.stringify(JSON.stringify(works));
+    const aboutJson = JSON.stringify(JSON.stringify(about));
+    const heroJson  = JSON.stringify(JSON.stringify(hero));
+    const pw = JSON.stringify(localStorage.getItem(PW_KEY)||DEFAULT_PW);
+    const dataScript = '<scr'+'ipt id="__embedded_data__">\n'
+      +'(function(){\n'
+      +'try{localStorage.setItem("'+WORKS_KEY+'",'+worksJson+');}catch(e){}\n'
+      +'try{localStorage.setItem("'+ABOUT_KEY+'",'+aboutJson+');}catch(e){}\n'
+      +'try{localStorage.setItem("'+HERO_KEY+'",'+heroJson+');}catch(e){}\n'
+      +'try{localStorage.setItem("'+PW_KEY+'",'+pw+');}catch(e){}\n'
+      +'try{sessionStorage.removeItem("'+SESSION_KEY+'");}catch(e){}\n'
+      +'})();\n'
+      +'<\/scr'+'ipt>';
 
-  // 用 DOM 截取（資料都在記憶體裡）
-  let html = document.documentElement.outerHTML;
+    html = html.replace('</head>', dataScript+'\n</head>');
 
-  // 清除 admin 殘留
-  html = html.replace(/class="admin-panel[^"]*"/g, 'class="admin-panel"');
-  html = html.replace(/class="admin-bar[^"]*"/g, 'class="admin-bar"');
-  html = html.replace(/class="admin-pill[^"]*"/g, 'class="admin-pill"');
-  html = html.replace(/class="card-admin-row[^"]*"/g, 'class="card-admin-row"');
-  html = html.replace(/(id="addBtn"[^>]*)display:\s*inline-flex/g, '$1display:none');
-  html = html.replace(/(id="addUiuxBtn"[^>]*)display:\s*inline-flex/g, '$1display:none');
-  html = html.replace(/(id="saveBtn"(?!2)[^>]*)display:\s*inline-flex/g, '$1display:none');
-  html = html.replace(/(id="saveBtn2"[^>]*)display:\s*inline-flex/g, '$1display:none');
-  html = html.replace(/(id="footerAdminBtn"[^>]*)display:[^;>]*/g, '$1display:none');
-  html = html.replace(/(id="footerLoginBtn"[^>]*)display:\s*none/g, '$1display:inline-flex');
-
-  // 移除舊嵌入資料，加入新的
-  html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>/g, '');
-  const dataScript = buildDataScript();
-  html = html.replace('</head>', dataScript + '\n</head>');
-
-  // 下載
-  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'index.html';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  showToast('✓ 已下載 index.html');
-
-  // 還原 admin 狀態
-  if(wasAdmin){
-    isAdmin = true;
-    applyAdminUI();
+    // 下載
+    const blob = new Blob([html],{type:'text/html;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'index.html';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('✓ 已下載 index.html');
+  } catch(e){
+    showToast('下載失敗：'+e.message);
+    console.error(e);
   }
 }
 
-function buildDataScript(){
-  return `<script id="__embedded_data__">
-(function(){
-  try{localStorage.setItem('${WORKS_KEY}',${JSON.stringify(JSON.stringify(works))});}catch(e){}
-  try{localStorage.setItem('${ABOUT_KEY}',${JSON.stringify(JSON.stringify(about))});}catch(e){}
-  try{localStorage.setItem('${HERO_KEY}',${JSON.stringify(JSON.stringify(hero))});}catch(e){}
-  try{localStorage.setItem('${PW_KEY}',${JSON.stringify(localStorage.getItem(PW_KEY)||DEFAULT_PW)});}catch(e){}
-  try{sessionStorage.removeItem('${SESSION_KEY}');}catch(e){}
-})();
-<\/script>\`;
-}
+function buildDataScript(){} // kept for compat
 
 // ─── Mobile Menu ───
 function toggleMobileMenu(){
@@ -2280,82 +2285,127 @@ init();
 observeScrollBounce();
 </script>
 
-<!-- ═══ THREE.JS GLOBE ═══ -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- ═══ TERRAIN BG ═══ -->
 <script>
 (function(){
-  var canvas = document.getElementById('globeCanvas');
-  var W = 780, H = 780;
-  var DPR = window.devicePixelRatio || 1;
+  var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
+    window.webkitRequestAnimationFrame || window.msRequestAnimationFrame ||
+    function(cb){ window.setTimeout(cb, 1000/60); };
+  window.requestAnimationFrame = requestAnimationFrame;
 
-  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(DPR);
-  renderer.setSize(W, H);
-  renderer.setClearColor(0x000000, 0);
+  var background = document.getElementById('bgCanvas');
+  var bgCtx = background.getContext('2d');
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  background.width = width;
+  background.height = height;
 
-  var scene = new THREE.Scene();
-  var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
-  camera.position.z = 2.6;
-
-  // Lighting
-  var ambient = new THREE.AmbientLight(0x333355, 1.2);
-  scene.add(ambient);
-  var sun = new THREE.DirectionalLight(0xffffff, 1.6);
-  sun.position.set(-4, 2, 5);
-  scene.add(sun);
-  var rim = new THREE.DirectionalLight(0x2244aa, 0.35);
-  rim.position.set(4, -2, -4);
-  scene.add(rim);
-
-  var loader = new THREE.TextureLoader();
-  loader.crossOrigin = 'anonymous';
-
-  var BASE = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/';
-  var SCOPE = 'https://www.solarsystemscope.com/textures/download/';
-
-  // Earth sphere
-  var geo = new THREE.SphereGeometry(1, 64, 64);
-  var mat = new THREE.MeshPhongMaterial({ shininess: 25 });
-  var earth = new THREE.Mesh(geo, mat);
-  earth.rotation.z = THREE.Math.degToRad(23.5);
-  scene.add(earth);
-
-  // Clouds
-  var cloudGeo = new THREE.SphereGeometry(1.015, 64, 64);
-  var cloudMat = new THREE.MeshPhongMaterial({ transparent: true, opacity: 0, depthWrite: false });
-  var clouds = new THREE.Mesh(cloudGeo, cloudMat);
-  clouds.rotation.z = THREE.Math.degToRad(23.5);
-  scene.add(clouds);
-
-  // Atmosphere glow
-  var atmGeo = new THREE.SphereGeometry(1.06, 64, 64);
-  var atmMat = new THREE.MeshPhongMaterial({
-    color: 0x2255cc, transparent: true, opacity: 0.08, side: THREE.BackSide
-  });
-  scene.add(new THREE.Mesh(atmGeo, atmMat));
-
-  // ── earth_01：白天大氣版 ──
-  var earth_01 = {
-    map:    BASE + 'earth_atmos_2048.jpg',
-    spec:   BASE + 'earth_specular_2048.jpg',
-    normal: BASE + 'earth_normal_2048.jpg',
-    cloud:  BASE + 'earth_clouds_1024.png',
+  function Terrain(options){
+    options = options || {};
+    this.terrain = document.createElement('canvas');
+    this.terCtx = this.terrain.getContext('2d');
+    this.scrollDelay = options.scrollDelay || 90;
+    this.lastScroll = new Date().getTime();
+    this.terrain.width = width;
+    this.terrain.height = height;
+    this.terrain.style.cssText = 'position:fixed;top:0;left:0;pointer-events:none;z-index:-1';
+    this.fillStyle = options.fillStyle || '#191D4C';
+    this.mHeight = options.mHeight || height;
+    this.points = [];
+    var displacement = options.displacement || 140;
+    var power = Math.pow(2, Math.ceil(Math.log(width) / Math.log(2)));
+    this.points[0] = this.mHeight;
+    this.points[power] = this.points[0];
+    for(var i=1; i<power; i*=2){
+      for(var j=(power/i)/2; j<power; j+=power/i){
+        this.points[j] = ((this.points[j-(power/i)/2] + this.points[j+(power/i)/2])/2) +
+          Math.floor(Math.random() * -displacement + displacement);
+      }
+      displacement *= 0.6;
+    }
+    document.body.appendChild(this.terrain);
+  }
+  Terrain.prototype.update = function(){
+    this.terCtx.clearRect(0,0,width,height);
+    this.terCtx.fillStyle = this.fillStyle;
+    if(new Date().getTime() > this.lastScroll + this.scrollDelay){
+      this.lastScroll = new Date().getTime();
+      this.points.push(this.points.shift());
+    }
+    this.terCtx.beginPath();
+    for(var i=0; i<=width; i++){
+      if(i===0) this.terCtx.moveTo(0, this.points[0]);
+      else if(this.points[i]!==undefined) this.terCtx.lineTo(i, this.points[i]);
+    }
+    this.terCtx.lineTo(width, this.terrain.height);
+    this.terCtx.lineTo(0, this.terrain.height);
+    this.terCtx.lineTo(0, this.points[0]);
+    this.terCtx.fill();
   };
 
-  // 使用 earth_01
-  loader.load(earth_01.map,    function(t){ mat.map = t; mat.needsUpdate = true; });
-  loader.load(earth_01.spec,   function(t){ mat.specularMap = t; mat.specular = new THREE.Color(0x446688); mat.needsUpdate = true; });
-  loader.load(earth_01.normal, function(t){ mat.normalMap = t; mat.normalScale = new THREE.Vector2(0.5, 0.5); mat.needsUpdate = true; });
-  loader.load(earth_01.cloud,  function(t){ cloudMat.map = t; cloudMat.alphaMap = t; cloudMat.opacity = 0.42; cloudMat.needsUpdate = true; });
+  function Star(options){
+    this.size = Math.random() * 2;
+    this.speed = Math.random() * 0.05;
+    this.x = options.x;
+    this.y = options.y;
+  }
+  Star.prototype.reset = function(){
+    this.size = Math.random() * 2;
+    this.speed = Math.random() * 0.05;
+    this.x = width;
+    this.y = Math.random() * height;
+  };
+  Star.prototype.update = function(){
+    this.x -= this.speed;
+    if(this.x < 0) this.reset();
+    else bgCtx.fillRect(this.x, this.y, this.size, this.size);
+  };
 
-  // Handle canvas resize
-  window.addEventListener('resize', function(){});
+  function ShootingStar(){this.reset();}
+  ShootingStar.prototype.reset = function(){
+    this.x = Math.random() * width;
+    this.y = 0;
+    this.len = (Math.random()*80)+10;
+    this.speed = (Math.random()*10)+6;
+    this.size = (Math.random()*1)+0.1;
+    this.waitTime = new Date().getTime() + (Math.random()*3000)+500;
+    this.active = false;
+  };
+  ShootingStar.prototype.update = function(){
+    if(this.active){
+      this.x -= this.speed; this.y += this.speed;
+      if(this.x<0||this.y>=height) this.reset();
+      else{
+        bgCtx.lineWidth = this.size;
+        bgCtx.beginPath();
+        bgCtx.moveTo(this.x, this.y);
+        bgCtx.lineTo(this.x+this.len, this.y-this.len);
+        bgCtx.stroke();
+      }
+    } else {
+      if(this.waitTime < new Date().getTime()) this.active = true;
+    }
+  };
+
+  var entities = [];
+  for(var i=0; i<Math.floor(height/2); i++){
+    entities.push(new Star({x:Math.random()*width, y:Math.random()*height}));
+  }
+  entities.push(new ShootingStar());
+  entities.push(new ShootingStar());
+  entities.push(new Terrain({mHeight:(height/2)-120}));
+  entities.push(new Terrain({displacement:120, scrollDelay:50, fillStyle:'rgb(17,20,40)', mHeight:(height/2)-60}));
+  entities.push(new Terrain({displacement:100, scrollDelay:20, fillStyle:'rgb(10,10,5)', mHeight:height/2}));
 
   function animate(){
+    bgCtx.fillStyle = '#110E19';
+    bgCtx.fillRect(0,0,width,height);
+    bgCtx.fillStyle = '#ffffff';
+    bgCtx.strokeStyle = '#ffffff';
+    var len = entities.length;
+    while(len--) entities[len].update();
     requestAnimationFrame(animate);
-    earth.rotation.y  += 0.0015;
-    clouds.rotation.y += 0.0018;
-    renderer.render(scene, camera);
   }
   animate();
 })();
