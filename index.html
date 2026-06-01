@@ -1299,15 +1299,15 @@ function updateSection(i,field,val){
 }
 function addSecImgs(i,input){
   const files=Array.from(input.files);
-  files.forEach(f=>{
-    const r=new FileReader();
-    r.onload=ev=>{
-      compressImage(ev.target.result,1400,0.92,data=>{
-        if(!about.sections[i].imgs)about.sections[i].imgs=[];
-        about.sections[i].imgs.push(data);
-        saveAboutSections(); renderApSections();
-      });
-    };r.readAsDataURL(f);
+  files.forEach(async f=>{
+    showToast('上傳中...');
+    try{
+      const url = await uploadToImgBB(f);
+      if(!about.sections[i].imgs)about.sections[i].imgs=[];
+      about.sections[i].imgs.push(url);
+      saveAboutSections(); renderApSections();
+      showToast('✓ 圖片已上傳');
+    }catch(err){ showToast('上傳失敗：'+err.message); }
   });
   input.value='';
 }
@@ -1447,18 +1447,54 @@ function saveAbout(){
 }
 
 // ─── Photo (auto-save on upload) ───
-document.getElementById('apPhotoFile').addEventListener('change',e=>{
+// ─── ImgBB Upload ───
+const IMGBB_KEY = '987f42c53c2117b69a6e02079c25835f';
+
+async function uploadToImgBB(file){
+  return new Promise((resolve, reject)=>{
+    // First compress to 1280px / 0.82 quality
+    const r = new FileReader();
+    r.onload = ev => {
+      const img = new Image();
+      img.onload = ()=>{
+        const MAX=1280;
+        let w=img.width, h=img.height;
+        if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+        const c=document.createElement('canvas');
+        c.width=w;c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        const base64 = c.toDataURL('image/jpeg',0.82).split(',')[1];
+        const form = new FormData();
+        form.append('key', IMGBB_KEY);
+        form.append('image', base64);
+        fetch('https://api.imgbb.com/1/upload', {method:'POST', body:form})
+          .then(res=>res.json())
+          .then(data=>{
+            if(data.success) resolve(data.data.url);
+            else reject(new Error('ImgBB 上傳失敗'));
+          })
+          .catch(reject);
+      };
+      img.src = ev.target.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+
+// ─── About 個人照片 ───
+document.getElementById('apPhotoFile').addEventListener('change',async e=>{
   const f=e.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=ev=>compressImage(ev.target.result,900,0.85,data=>{
-    about.photo=data;
-    document.getElementById('apPhotoPreview').innerHTML=`<img src="${data}">`;
+  showToast('上傳中...');
+  try{
+    const url = await uploadToImgBB(f);
+    about.photo=url;
+    document.getElementById('apPhotoPreview').innerHTML=`<img src="${url}">`;
     try{localStorage.setItem(ABOUT_KEY,JSON.stringify(about));}catch{}
     applyAbout();
-    showToast('✓ 照片已儲存');
-  });
-  r.readAsDataURL(f);
+    showToast('✓ 照片已上傳');
+  }catch(err){ showToast('上傳失敗：'+err.message); }
 });
+
 function removeAboutPhoto(){
   about.photo=null;
   document.getElementById('apPhotoPreview').innerHTML='🙂';
@@ -1467,18 +1503,26 @@ function removeAboutPhoto(){
   showToast('✓ 照片已移除');
 }
 
-// ─── Compress ───
-// 直接讀取原始檔案，不壓縮不縮圖
+// ─── (compressImage 保留給 saveToLocal 壓縮用) ───
 function compressImage(src,maxW,q,cb){
-  // ignore maxW and quality — pass through original data
-  cb(src);
+  const img=new Image();
+  img.onload=()=>{
+    const MAX=1280;
+    let w=img.width,h=img.height;
+    if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+    const c=document.createElement('canvas');
+    c.width=w;c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    cb(c.toDataURL('image/jpeg',0.82));
+  };
+  img.src=src;
 }
 
 // ─── (filters removed - works split into fixed blocks) ───
 
 // ─── Multi-image state ───
-let currentImgData = null;   // single (graphic)
-let currentImgs = [];        // multi (uiux): [{data, name}]
+let currentImgData = null;
+let currentImgs = [];
 
 // ─── Graphic panel toggle ───
 function toggleAddPanel(){
@@ -1519,29 +1563,31 @@ dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');}
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)handleFile(f);});
 document.getElementById('f-img').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
-function handleFile(file){
+async function handleFile(file){
   if(!file.type.startsWith('image/'))return showToast('請選擇圖片檔案');
-  const r=new FileReader();
-  r.onload=ev=>compressImage(ev.target.result,1200,0.82,data=>{
-    currentImgData=data;
+  showToast('上傳中...');
+  try{
+    const url = await uploadToImgBB(file);
+    currentImgData = url;
     const p=document.getElementById('dropPreview');
-    p.src=data;p.style.display='block';
+    p.src=url;p.style.display='block';
     document.querySelector('#dropZone small').style.display='none';
-  });
-  r.readAsDataURL(file);
+    showToast('✓ 圖片已上傳');
+  }catch(err){ showToast('上傳失敗：'+err.message); }
 }
 
 // ─── UIUX cover image ───
-document.getElementById('fu-cover').addEventListener('change',e=>{
+document.getElementById('fu-cover').addEventListener('change',async e=>{
   const f=e.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=ev=>compressImage(ev.target.result,800,0.9,data=>{
-    currentUiuxCover=data;
+  showToast('上傳中...');
+  try{
+    const url = await uploadToImgBB(f);
+    currentUiuxCover=url;
     const p=document.getElementById('fuCoverPreview');
-    p.src=data;p.style.display='block';
+    p.src=url;p.style.display='block';
     document.querySelector('#fuCoverZone small').style.display='none';
-  });
-  r.readAsDataURL(f);
+    showToast('✓ 封面已上傳');
+  }catch(err){ showToast('上傳失敗：'+err.message); }
 });
 
 // ─── Blog block editor ───
@@ -1579,14 +1625,15 @@ function renderFuBlocks(){
            </div>`}
     </div>`).join('');
 }
-function loadBlockImg(i,input){
+async function loadBlockImg(i,input){
   const f=input.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=ev=>compressImage(ev.target.result,1400,0.92,data=>{
-    currentUiuxBlocks[i].content=data;
+  showToast('上傳中...');
+  try{
+    const url = await uploadToImgBB(f);
+    currentUiuxBlocks[i].content=url;
     renderFuBlocks();
-  });
-  r.readAsDataURL(f);
+    showToast('✓ 圖片已上傳');
+  }catch(err){ showToast('上傳失敗：'+err.message); }
 }
 
 // ─── Add graphic work ───
