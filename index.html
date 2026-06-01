@@ -2204,43 +2204,70 @@ function saveToLocal(){
 // ─── Export HTML ───
 async function exportHTML(){
   showToast('準備下載中...');
-  try{
-    // 抓原始 HTML（不含動態 DOM 如 terrain canvas）
-    const res = await fetch(location.href);
-    let html = await res.text();
 
-    // 移除舊嵌入資料
-    html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>\n?/g, '');
+  // 先把記憶體資料同步到 localStorage
+  try{localStorage.setItem(WORKS_KEY,JSON.stringify(works));}catch{}
+  try{localStorage.setItem(ABOUT_KEY,JSON.stringify(about));}catch{}
+  try{localStorage.setItem(HERO_KEY,JSON.stringify(hero));}catch{}
 
-    // 嵌入最新資料
-    const worksJson = JSON.stringify(JSON.stringify(works));
-    const aboutJson = JSON.stringify(JSON.stringify(about));
-    const heroJson  = JSON.stringify(JSON.stringify(hero));
-    const pw = JSON.stringify(localStorage.getItem(PW_KEY)||DEFAULT_PW);
-    const dataScript = '<scr'+'ipt id="__embedded_data__">\n'
-      +'(function(){\n'
-      +'try{localStorage.setItem("'+WORKS_KEY+'",'+worksJson+');}catch(e){}\n'
-      +'try{localStorage.setItem("'+ABOUT_KEY+'",'+aboutJson+');}catch(e){}\n'
-      +'try{localStorage.setItem("'+HERO_KEY+'",'+heroJson+');}catch(e){}\n'
-      +'try{localStorage.setItem("'+PW_KEY+'",'+pw+');}catch(e){}\n'
-      +'try{sessionStorage.removeItem("'+SESSION_KEY+'");}catch(e){}\n'
-      +'})();\n'
-      +'<\/scr'+'ipt>';
+  // 從 localStorage 讀取最新資料（確保完整）
+  const worksRaw = localStorage.getItem(WORKS_KEY)||'[]';
+  const aboutRaw = localStorage.getItem(ABOUT_KEY)||'{}';
+  const heroRaw  = localStorage.getItem(HERO_KEY)||'{}';
+  const pwRaw    = localStorage.getItem(PW_KEY)||DEFAULT_PW;
 
-    html = html.replace('</head>', dataScript+'\n</head>');
+  // 移除 terrain 動態 canvas
+  const dynamicCanvases = [];
+  document.querySelectorAll('body > canvas:not(#bgCanvas)').forEach(el=>{
+    dynamicCanvases.push({el, next: el.nextSibling});
+    el.remove();
+  });
 
-    // 下載
-    const blob = new Blob([html],{type:'text/html;charset=utf-8'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'index.html';
-    a.click();
-    URL.revokeObjectURL(a.href);
-    showToast('✓ 已下載 index.html');
-  } catch(e){
-    showToast('下載失敗：'+e.message);
-    console.error(e);
-  }
+  // 暫時切換訪客狀態
+  const wasAdmin = isAdmin;
+  isAdmin = false;
+  applyAdminUI();
+  document.getElementById('adminPanel').classList.remove('open');
+  document.body.style.overflow = '';
+
+  await new Promise(r => setTimeout(r, 50));
+
+  let html = document.documentElement.outerHTML;
+
+  // 還原 terrain canvas 和 admin 狀態
+  dynamicCanvases.forEach(({el, next})=>{ document.body.insertBefore(el, next); });
+  if(wasAdmin){ isAdmin = true; applyAdminUI(); }
+
+  // 清除殘留 admin class
+  html = html.replace(/class="admin-panel open"/g, 'class="admin-panel"');
+  html = html.replace(/class="admin-bar show"/g, 'class="admin-bar"');
+  html = html.replace(/class="admin-pill show"/g, 'class="admin-pill"');
+
+  // 移除舊嵌入資料
+  html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>\n?/g, '');
+
+  // 嵌入最新資料（放在 </body> 前，確保在 init() 之前執行）
+  const dataScript = '<scr'+'ipt id="__embedded_data__">\n'
+    +'(function(){\n'
+    +'try{localStorage.setItem("'+WORKS_KEY+'",'+JSON.stringify(worksRaw)+');}catch(e){}\n'
+    +'try{localStorage.setItem("'+ABOUT_KEY+'",'+JSON.stringify(aboutRaw)+');}catch(e){}\n'
+    +'try{localStorage.setItem("'+HERO_KEY+'",'+JSON.stringify(heroRaw)+');}catch(e){}\n'
+    +'try{localStorage.setItem("'+PW_KEY+'",'+JSON.stringify(pwRaw)+');}catch(e){}\n'
+    +'try{sessionStorage.removeItem("'+SESSION_KEY+'");}catch(e){}\n'
+    +'})();\n'
+    +'<\/scr'+'ipt>';
+
+  // 插在 <script> 主程式之前，確保 init() 讀取時資料已存在
+  html = html.replace('<script>\n// ─── Keys ───', dataScript+'\n<script>\n// ─── Keys ───');
+
+  // 下載
+  const blob = new Blob([html],{type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'index.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('✓ 已下載 index.html');
 }
 
 function buildDataScript(){} // kept for compat
