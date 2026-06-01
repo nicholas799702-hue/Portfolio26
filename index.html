@@ -1085,10 +1085,10 @@ footer{
         <span class="ap-section-title">部署 GitHub Pages</span>
       </div>
       <div class="ap-section-body">
-        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem">下載 HTML，上傳至 GitHub 即可部署。所有作品資料都已嵌入。</p>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem">下載 <strong>outhtml</strong>，上傳至 GitHub 即可部署。所有作品資料都已嵌入。</p>
         <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1.25rem;font-family:'JetBrains Mono',monospace">流程：下載 → 改名 index.html → 上傳 GitHub</p>
         <button class="btn btn-primary" style="font-size:0.85rem" onclick="exportHTML()">
-          ↓ 下載 index.html
+          ↓ 下載 outhtml
         </button>
       </div>
     </div>
@@ -2205,16 +2205,23 @@ function saveToLocal(){
 async function exportHTML(){
   showToast('準備下載中...');
 
-  // 先把記憶體資料同步到 localStorage
+  // 同步資料到 localStorage
   try{localStorage.setItem(WORKS_KEY,JSON.stringify(works));}catch{}
   try{localStorage.setItem(ABOUT_KEY,JSON.stringify(about));}catch{}
   try{localStorage.setItem(HERO_KEY,JSON.stringify(hero));}catch{}
-
-  // 從 localStorage 讀取最新資料（確保完整）
   const worksRaw = localStorage.getItem(WORKS_KEY)||'[]';
   const aboutRaw = localStorage.getItem(ABOUT_KEY)||'{}';
   const heroRaw  = localStorage.getItem(HERO_KEY)||'{}';
   const pwRaw    = localStorage.getItem(PW_KEY)||DEFAULT_PW;
+
+  // 訪客狀態，重新 render 乾淨卡片
+  const wasAdmin = isAdmin;
+  isAdmin = false;
+  applyAdminUI();
+  renderWorks();
+  document.getElementById('adminPanel').classList.remove('open');
+  document.body.style.overflow = '';
+  await new Promise(r => setTimeout(r, 80));
 
   // 移除 terrain 動態 canvas
   const dynamicCanvases = [];
@@ -2223,30 +2230,29 @@ async function exportHTML(){
     el.remove();
   });
 
-  // 暫時切換訪客狀態
-  const wasAdmin = isAdmin;
-  isAdmin = false;
-  applyAdminUI();
-  document.getElementById('adminPanel').classList.remove('open');
-  document.body.style.overflow = '';
+  // 用 head/body 分別序列化，避免 outerHTML 截掉 script 結尾
+  const headHTML = document.head.innerHTML;
+  const bodyHTML = document.body.innerHTML;
 
-  await new Promise(r => setTimeout(r, 50));
+  // 還原
+  dynamicCanvases.forEach(({el,next})=>document.body.insertBefore(el,next));
+  if(wasAdmin){ isAdmin=true; applyAdminUI(); renderWorks(); }
 
-  let html = document.documentElement.outerHTML;
-
-  // 還原 terrain canvas 和 admin 狀態
-  dynamicCanvases.forEach(({el, next})=>{ document.body.insertBefore(el, next); });
-  if(wasAdmin){ isAdmin = true; applyAdminUI(); }
+  // 組合完整 HTML
+  let html = '<!DOCTYPE html>\n<html lang="zh-TW">\n<head>\n'
+    + headHTML + '\n</head>\n<body>\n'
+    + bodyHTML + '\n</body>\n</html>';
 
   // 清除殘留 admin class
   html = html.replace(/class="admin-panel open"/g, 'class="admin-panel"');
   html = html.replace(/class="admin-bar show"/g, 'class="admin-bar"');
   html = html.replace(/class="admin-pill show"/g, 'class="admin-pill"');
+  html = html.replace(/class="card-admin-row show"/g, 'class="card-admin-row"');
 
   // 移除舊嵌入資料
   html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>\n?/g, '');
 
-  // 嵌入最新資料（放在 </body> 前，確保在 init() 之前執行）
+  // 嵌入資料（插在主 script 之前）
   const dataScript = '<scr'+'ipt id="__embedded_data__">\n'
     +'(function(){\n'
     +'try{localStorage.setItem("'+WORKS_KEY+'",'+JSON.stringify(worksRaw)+');}catch(e){}\n'
@@ -2256,21 +2262,19 @@ async function exportHTML(){
     +'try{sessionStorage.removeItem("'+SESSION_KEY+'");}catch(e){}\n'
     +'})();\n'
     +'<\/scr'+'ipt>';
-
-  // 插在 <script> 主程式之前，確保 init() 讀取時資料已存在
   html = html.replace('<script>\n// ─── Keys ───', dataScript+'\n<script>\n// ─── Keys ───');
 
   // 下載
   const blob = new Blob([html],{type:'text/html;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'index.html';
+  a.download = 'outhtml.html';
   a.click();
   URL.revokeObjectURL(a.href);
-  showToast('✓ 已下載 index.html');
+  showToast('✓ 已下載 outhtml.html');
 }
 
-function buildDataScript(){} // kept for compat
+function buildDataScript(){}
 
 // ─── Mobile Menu ───
 function toggleMobileMenu(){
@@ -2437,5 +2441,6 @@ observeScrollBounce();
   animate();
 })();
 </script>
+<div id="eof-marker" style="display:none"></div>
 </body>
 </html>
