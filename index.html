@@ -1893,7 +1893,10 @@ function openEditRow(id){
   const w=works.find(x=>x.id===id);
   if(w&&w.blocks&&w.blocks.length) renderEiBlocks(id);
 }
-function closeEditRow(id){ document.getElementById(`edit-${id}`).style.display='none'; }
+function closeEditRow(id){
+  document.getElementById(`edit-${id}`).style.display='none';
+  renderWorks(); // 關閉後才更新前台卡片
+}
 
 // ─── Blocks editor inside edit row ───
 function renderEiBlocks(id){
@@ -1959,9 +1962,14 @@ function eiAutoSave(id){
   clearTimeout(_eiTimers[id]);
   _eiTimers[id]=setTimeout(()=>{
     try{localStorage.setItem(WORKS_KEY,JSON.stringify(works));}catch{}
-    renderWorks();
+    // 不呼叫 renderWorks()，避免重建 DOM 導致編輯列消失
+    // 只更新前台卡片縮圖（不重建整個 grid）
     const st=document.getElementById(`ei-status-${id}`);
     if(st) st.textContent='✓ 已儲存';
+    // 儲存後靜默更新前台
+    setTimeout(()=>{
+      if(st) st.textContent='';
+    }, 2000);
   },600);
 }
 
@@ -1976,9 +1984,15 @@ function autoSaveEdit(id){
     w.category=document.getElementById(`ei-cat-${id}`).value;
     w.desc=document.getElementById(`ei-desc-${id}`).value.trim();
     try{localStorage.setItem(WORKS_KEY,JSON.stringify(works));}catch{}
-    renderWorks();
+    // 不重建 DOM，只更新表格該列的顯示文字
+    const row=document.getElementById(`row-${id}`);
+    if(row){
+      const cells=row.querySelectorAll('td');
+      if(cells[1]) cells[1].textContent=w.title;
+      if(cells[2]) cells[2].style.color='var(--muted)', cells[2].textContent=w.category;
+    }
     const st=document.getElementById(`ei-status-${id}`);
-    if(st){st.textContent='✓ 已儲存';}
+    if(st){ st.textContent='✓ 已儲存'; setTimeout(()=>{ if(st) st.textContent=''; },2000); }
   },600);
 }
 function saveEditRow(id){ autoSaveEdit(id); }
@@ -2165,42 +2179,30 @@ function saveToLocal(){
 }
 
 // ─── Export HTML for GitHub Pages ───
-function exportHTML(){
-  // 1. 先關閉後台、確保前台狀態
-  const adminPanelEl = document.getElementById('adminPanel');
-  const wasOpen = adminPanelEl.classList.contains('open');
-  adminPanelEl.classList.remove('open');
-  document.body.style.overflow='';
+async function exportHTML(){
+  showToast('準備下載中...');
 
-  // 短暫等 DOM 更新後再抓 HTML
-  setTimeout(()=>{
-    let html = document.documentElement.outerHTML;
+  try{
+    // 抓原始 HTML 檔案（不是 JS 渲染後的 DOM）
+    const res = await fetch(location.href);
+    let html = await res.text();
 
-    // 2. 嵌入資料
+    // 1. 移除舊嵌入資料
+    html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>/g, '');
+
+    // 2. 嵌入最新資料 + 強制訪客模式
     const dataScript = `<script id="__embedded_data__">
 (function(){
   try{localStorage.setItem('${WORKS_KEY}',${JSON.stringify(JSON.stringify(works))});}catch(e){}
   try{localStorage.setItem('${ABOUT_KEY}',${JSON.stringify(JSON.stringify(about))});}catch(e){}
   try{localStorage.setItem('${HERO_KEY}',${JSON.stringify(JSON.stringify(hero))});}catch(e){}
   try{localStorage.setItem('${PW_KEY}',${JSON.stringify(localStorage.getItem(PW_KEY)||DEFAULT_PW)});}catch(e){}
+  try{sessionStorage.removeItem('${SESSION_KEY}');}catch(e){}
 })();
 <\/script>`;
-
-    // 3. 移除舊的嵌入資料
-    html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>/g, '');
-
-    // 4. 確保後台面板在 HTML 裡是關閉狀態
-    html = html.replace(/id="adminPanel" style="display:block[^"]*"/g, 'id="adminPanel" style="display:none"');
-    html = html.replace(/id="adminPanel" class="admin-panel open"/g, 'id="adminPanel" class="admin-panel"');
-
-    // 5. 移除 admin bar 的 show class（讓訪客不看到後台列）
-    html = html.replace(/class="admin-bar show"/g, 'class="admin-bar"');
-    html = html.replace(/class="admin-pill show"/g, 'class="admin-pill"');
-
-    // 6. 注入資料到 </head> 前
     html = html.replace('</head>', dataScript + '\n</head>');
 
-    // 7. 下載
+    // 3. 下載
     const blob = new Blob([html], {type:'text/html;charset=utf-8'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -2208,14 +2210,34 @@ function exportHTML(){
     a.click();
     URL.revokeObjectURL(a.href);
 
-    // 如果原本後台是開的，下載後還原
-    if(wasOpen){
-      adminPanelEl.classList.add('open');
-      document.body.style.overflow='hidden';
-    }
+    showToast('✓ 已下載 index.html');
+  } catch(e){
+    // fetch 失敗時（file:// 協定）改用 DOM 方式
+    let html = document.documentElement.outerHTML;
+    html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>/g, '');
+    html = html.replace(/class="admin-panel open"/g, 'class="admin-panel"');
+    html = html.replace(/class="admin-bar show"/g, 'class="admin-bar"');
+    html = html.replace(/class="admin-pill show"/g, 'class="admin-pill"');
 
-    showToast('✓ 已下載 index.html（前台版本）');
-  }, 100);
+    const dataScript = `<script id="__embedded_data__">
+(function(){
+  try{localStorage.setItem('${WORKS_KEY}',${JSON.stringify(JSON.stringify(works))});}catch(e){}
+  try{localStorage.setItem('${ABOUT_KEY}',${JSON.stringify(JSON.stringify(about))});}catch(e){}
+  try{localStorage.setItem('${HERO_KEY}',${JSON.stringify(JSON.stringify(hero))});}catch(e){}
+  try{localStorage.setItem('${PW_KEY}',${JSON.stringify(localStorage.getItem(PW_KEY)||DEFAULT_PW)});}catch(e){}
+  try{sessionStorage.removeItem('${SESSION_KEY}');}catch(e){}
+})();
+<\/script>`;
+    html = html.replace('</head>', dataScript + '\n</head>');
+
+    const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'index.html';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('✓ 已下載 index.html');
+  }
 }
 
 // ─── Mobile Menu ───
