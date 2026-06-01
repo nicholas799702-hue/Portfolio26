@@ -2166,37 +2166,56 @@ function saveToLocal(){
 
 // ─── Export HTML for GitHub Pages ───
 function exportHTML(){
-  // Get current HTML
-  let html = document.documentElement.outerHTML;
+  // 1. 先關閉後台、確保前台狀態
+  const adminPanelEl = document.getElementById('adminPanel');
+  const wasOpen = adminPanelEl.classList.contains('open');
+  adminPanelEl.classList.remove('open');
+  document.body.style.overflow='';
 
-  // Build the data injection script
-  const dataScript = `<script id="__embedded_data__">
+  // 短暫等 DOM 更新後再抓 HTML
+  setTimeout(()=>{
+    let html = document.documentElement.outerHTML;
+
+    // 2. 嵌入資料
+    const dataScript = `<script id="__embedded_data__">
 (function(){
-  var _w=${JSON.stringify(works)};
-  var _a=${JSON.stringify(about)};
-  var _h=${JSON.stringify(hero)};
-  var _p=${JSON.stringify(localStorage.getItem(PW_KEY)||DEFAULT_PW)};
-  try{localStorage.setItem('${WORKS_KEY}',JSON.stringify(_w));}catch(e){}
-  try{localStorage.setItem('${ABOUT_KEY}',JSON.stringify(_a));}catch(e){}
-  try{localStorage.setItem('${HERO_KEY}',JSON.stringify(_h));}catch(e){}
-  try{localStorage.setItem('${PW_KEY}',_p);}catch(e){}
+  try{localStorage.setItem('${WORKS_KEY}',${JSON.stringify(JSON.stringify(works))});}catch(e){}
+  try{localStorage.setItem('${ABOUT_KEY}',${JSON.stringify(JSON.stringify(about))});}catch(e){}
+  try{localStorage.setItem('${HERO_KEY}',${JSON.stringify(JSON.stringify(hero))});}catch(e){}
+  try{localStorage.setItem('${PW_KEY}',${JSON.stringify(localStorage.getItem(PW_KEY)||DEFAULT_PW)});}catch(e){}
 })();
 <\/script>`;
 
-  // Remove any existing embedded data script to avoid duplication
-  html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>/g, '');
+    // 3. 移除舊的嵌入資料
+    html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>/g, '');
 
-  // Inject before </head>
-  html = html.replace('</head>', dataScript + '\n</head>');
+    // 4. 確保後台面板在 HTML 裡是關閉狀態
+    html = html.replace(/id="adminPanel" style="display:block[^"]*"/g, 'id="adminPanel" style="display:none"');
+    html = html.replace(/id="adminPanel" class="admin-panel open"/g, 'id="adminPanel" class="admin-panel"');
 
-  // Download
-  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'index.html';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  showToast('✓ 已下載 index.html，上傳至 GitHub 即可部署');
+    // 5. 移除 admin bar 的 show class（讓訪客不看到後台列）
+    html = html.replace(/class="admin-bar show"/g, 'class="admin-bar"');
+    html = html.replace(/class="admin-pill show"/g, 'class="admin-pill"');
+
+    // 6. 注入資料到 </head> 前
+    html = html.replace('</head>', dataScript + '\n</head>');
+
+    // 7. 下載
+    const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'index.html';
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    // 如果原本後台是開的，下載後還原
+    if(wasOpen){
+      adminPanelEl.classList.add('open');
+      document.body.style.overflow='hidden';
+    }
+
+    showToast('✓ 已下載 index.html（前台版本）');
+  }, 100);
 }
 
 // ─── Mobile Menu ───
