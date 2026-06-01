@@ -1457,13 +1457,13 @@ async function uploadToImgBB(file){
     r.onload = ev => {
       const img = new Image();
       img.onload = ()=>{
-        const MAX=1280;
+        const MAX=2560;
         let w=img.width, h=img.height;
         if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
         const c=document.createElement('canvas');
         c.width=w;c.height=h;
         c.getContext('2d').drawImage(img,0,0,w,h);
-        const base64 = c.toDataURL('image/jpeg',0.82).split(',')[1];
+        const base64 = c.toDataURL('image/jpeg',0.95).split(',')[1];
         const form = new FormData();
         form.append('key', IMGBB_KEY);
         form.append('image', base64);
@@ -1507,13 +1507,13 @@ function removeAboutPhoto(){
 function compressImage(src,maxW,q,cb){
   const img=new Image();
   img.onload=()=>{
-    const MAX=1280;
+    const MAX=2560;
     let w=img.width,h=img.height;
     if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
     const c=document.createElement('canvas');
     c.width=w;c.height=h;
     c.getContext('2d').drawImage(img,0,0,w,h);
-    cb(c.toDataURL('image/jpeg',0.82));
+    cb(c.toDataURL('image/jpeg',0.95));
   };
   img.src=src;
 }
