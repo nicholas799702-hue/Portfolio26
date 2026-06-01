@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Portfolio</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -680,6 +681,8 @@ footer{
   #allWorksPage .about-inner,
   #aboutPage > div > div[style*="grid"]{grid-template-columns:1fr;gap:1.5rem}
 }
+/* Animate.css delay overrides */
+.animate__delay-1s{animation-delay:0.5s !important}
 </style>
 </head>
 <body>
@@ -723,20 +726,20 @@ footer{
 <section id="hero">
   <canvas id="globeCanvas"></canvas>
   <div class="folder-wrap">
-    <div class="folder-tab">
+    <div class="folder-tab animate__animated animate__bounceInDown">
       <span class="folder-tab-dot dot-red"></span>
       <span class="folder-tab-dot dot-yellow"></span>
       <span class="folder-tab-dot dot-green"></span>
       &nbsp;portfolio
     </div>
     <div class="folder-body">
-      <div class="folder-path">
+      <div class="folder-path animate__animated animate__bounceInLeft animate__delay-1s">
         <span>~/</span>works<span>/</span>portfolio
       </div>
       <div class="folder-name" id="heroName">
         Your<br><span class="accent-word">Creative</span><br>Universe
       </div>
-      <div class="folder-meta">
+      <div class="folder-meta animate__animated animate__bounceInUp animate__delay-1s">
         <div class="folder-meta-item">
           <span class="folder-meta-label">role</span>
           <span class="folder-meta-val" id="heroRole">Designer &amp; Creator</span>
@@ -750,7 +753,7 @@ footer{
           <span class="folder-meta-val" id="heroLocation">Taiwan</span>
         </div>
       </div>
-      <div class="folder-files" id="folderFiles">
+      <div class="folder-files animate__animated animate__bounceIn animate__delay-1s" id="folderFiles">
         <div class="file-chip file-chip-purple" onclick="goTo('about')"><span class="icon">📄</span>about_me.md</div>
         <div class="file-chip" onclick="goTo('works')"><span class="icon">🗂</span>works/</div>
       </div>
@@ -763,22 +766,22 @@ footer{
 <!-- ═══ ABOUT ═══ -->
 <section id="about" style="padding:0;max-width:100%">
   <div class="about-inner">
-    <div class="about-photo-wrap">
+    <div class="about-photo-wrap reveal-left">
       <div class="about-glow"></div>
       <div class="about-photo-placeholder" id="aboutPhotoWrap">🙂</div>
     </div>
-    <div class="about-text">
-      <p class="section-label">About Me</p>
-      <h2 class="about-title" id="aboutTitle">熱愛設計<br>享受創作過程</h2>
+    <div class="about-text reveal-right">
+      <p class="section-label animate__animated animate__backInDown">About Me</p>
+      <h2 class="about-title animate__animated animate__backInDown" id="aboutTitle">熱愛設計<br>享受創作過程</h2>
       <p class="about-body" id="aboutBody">我是一位跨領域的創作者，擅長將概念轉化為視覺語言。無論是品牌識別、插畫創作，還是使用者介面設計，都是我熱衷探索的領域。
 
 每個作品對我來說都是一次對話——與客戶、與使用者、也與自己。</p>
-      <div class="skills-grid" id="skillsList">
+      <div class="skills-grid animate__animated animate__backInDown" id="skillsList">
         <span class="skill-tag">品牌設計</span><span class="skill-tag">插畫</span>
         <span class="skill-tag">UI/UX</span><span class="skill-tag">Adobe CC</span>
         <span class="skill-tag">Figma</span><span class="skill-tag">攝影</span>
       </div>
-      <div style="margin-top:2rem">
+      <div style="margin-top:2rem" class="animate__animated animate__backInDown animate__delay-1s">
         <button class="btn btn-outline" onclick="openAboutPage()" style="font-size:0.82rem">View More →</button>
       </div>
     </div>
@@ -879,7 +882,7 @@ footer{
 
   <!-- 平面設計 block -->
   <div class="works-block" id="block-graphic">
-    <div class="works-block-header" style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem">
+    <div class="works-block-header scroll-bounce" data-anim="backInDown" style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem">
       <div>
         <p class="section-label">Graphic Design</p>
         <h2 class="section-title" style="margin-bottom:0">MY WORK</h2>
@@ -892,11 +895,11 @@ footer{
     <div class="works-grid" id="grid-graphic"></div>
   </div>
 
-  <div class="works-block-divider"></div>
+  <div class="works-block-divider scroll-bounce" data-anim="backInDown"></div>
 
   <!-- UI/UX block -->
   <div class="works-block" id="block-uiux">
-    <div class="works-block-header" style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem">
+    <div class="works-block-header scroll-bounce" data-anim="backInDown" style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem">
       <div>
         <p class="section-label">UI/UX</p>
         <h2 class="section-title" style="margin-bottom:0">PROJECTS</h2>
@@ -1683,6 +1686,7 @@ function deleteWork(id){
 function renderWorks(){
   renderBlock('grid-graphic',['平面設計','包裝設計','LOGO','攝影','其他'],false,'MY WORK','Graphic Design');
   renderBlock('grid-uiux',['UI/UX','網頁設計','其他'],true,'PROJECTS','UI/UX');
+  observeScrollBounce();
 }
 function renderBlock(gridId,categories,multiImg,title,label){
   const grid=document.getElementById(gridId);
@@ -1732,7 +1736,7 @@ function makeCardHtml(w,multiImg){
       : `<div class="work-img-placeholder" onclick="openLightbox(${w.id})">✦</div>`;
   }
   return `
-  <div class="work-card" data-id="${w.id}">
+  <div class="work-card scroll-bounce" data-anim="backInDown" data-id="${w.id}">
     ${imgHtml}
     <div class="work-info">
       <p class="work-category">${w.category}</p>
@@ -2069,7 +2073,24 @@ document.addEventListener('click',e=>{
   }
 });
 
+// ─── Scroll bounce (About + Works headers) ───
+function observeScrollBounce(){
+  const ib=new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        const anim=e.target.dataset.anim||'backInDown';
+        e.target.classList.add('animate__animated','animate__'+anim);
+        ib.unobserve(e.target);
+      }
+    });
+  },{threshold:0.15,rootMargin:'0px 0px -30px 0px'});
+  document.querySelectorAll('.scroll-bounce').forEach(el=>{
+    if(!el.classList.contains('animate__animated')) ib.observe(el);
+  });
+}
+
 init();
+observeScrollBounce();
 </script>
 
 <!-- ═══ THREE.JS GLOBE ═══ -->
