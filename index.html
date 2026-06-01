@@ -1088,21 +1088,11 @@ footer{
         <span class="ap-section-title">部署 GitHub Pages</span>
       </div>
       <div class="ap-section-body">
-        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1.25rem">填入 GitHub Token，按「推送」即可直接更新線上網站，不需要下載檔案。</p>
-        <div class="form-field" style="margin-bottom:1rem">
-          <label>GitHub Personal Access Token</label>
-          <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxx" style="font-family:'JetBrains Mono',monospace;font-size:0.82rem">
-          <p style="font-size:0.72rem;color:var(--muted);margin-top:0.35rem">Token 只存在瀏覽器記憶體，不會被儲存或上傳。</p>
-        </div>
-        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-primary" style="font-size:0.85rem" onclick="pushToGitHub()">
-            ↑ 推送到 GitHub
-          </button>
-          <button class="btn btn-outline" style="font-size:0.85rem" onclick="exportHTML()">
-            ↓ 下載 HTML（備用）
-          </button>
-          <span id="ghStatus" style="font-size:0.78rem;color:var(--muted);font-family:'JetBrains Mono',monospace"></span>
-        </div>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem">下載 HTML，上傳至 GitHub 即可部署。所有作品資料都已嵌入。</p>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1.25rem;font-family:'JetBrains Mono',monospace">流程：下載 → 改名 index.html → 上傳 GitHub</p>
+        <button class="btn btn-primary" style="font-size:0.85rem" onclick="exportHTML()">
+          ↓ 下載 index.html
+        </button>
       </div>
     </div>
 
@@ -2189,121 +2179,49 @@ function saveToLocal(){
 }
 
 // ─── Export HTML for GitHub Pages ───
-// ─── Push to GitHub ───
-const GH_OWNER = 'nicholas799702-hue';
-const GH_REPO  = 'Portfolio26';
-const GH_FILE  = 'index.html';
-
-async function pushToGitHub(){
-  const token = document.getElementById('ghToken').value.trim();
-  if(!token){ showToast('請先填入 GitHub Token'); return; }
-
-  const status = document.getElementById('ghStatus');
-  status.textContent = '⏳ 連線中...';
-
-  try{
-    // 1. 取得原始 HTML 和目前檔案的 SHA
-    const apiUrl = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE}`;
-    const headers = {
-      'Authorization': `token ${token}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'Content-Type': 'application/json'
-    };
-
-    status.textContent = '⏳ 取得原始檔案...';
-    const getRes = await fetch(apiUrl, {headers});
-    if(!getRes.ok) throw new Error(`無法取得檔案：${getRes.status} ${getRes.statusText}`);
-    const getJson = await getRes.json();
-    const sha = getJson.sha;
-
-    // 2. 解碼原始 HTML
-    let originalHtml = decodeURIComponent(escape(atob(getJson.content.replace(/\n/g,''))));
-
-    // 3. 嵌入最新資料
-    originalHtml = originalHtml.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>/g, '');
-    const dataScript = `<script id="__embedded_data__">
-(function(){
-  try{localStorage.setItem('${WORKS_KEY}',${JSON.stringify(JSON.stringify(works))});}catch(e){}
-  try{localStorage.setItem('${ABOUT_KEY}',${JSON.stringify(JSON.stringify(about))});}catch(e){}
-  try{localStorage.setItem('${HERO_KEY}',${JSON.stringify(JSON.stringify(hero))});}catch(e){}
-  try{localStorage.setItem('${PW_KEY}',${JSON.stringify(localStorage.getItem(PW_KEY)||DEFAULT_PW)});}catch(e){}
-  try{sessionStorage.removeItem('${SESSION_KEY}');}catch(e){}
-})();
-<\/script>`;
-    originalHtml = originalHtml.replace('</head>', dataScript + '\n</head>');
-
-    // 4. 編碼並推送
-    status.textContent = '⏳ 推送中...';
-    const encoded = btoa(unescape(encodeURIComponent(originalHtml)));
-    const pushRes = await fetch(apiUrl, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({
-        message: `Update portfolio data ${new Date().toLocaleString('zh-TW')}`,
-        content: encoded,
-        sha: sha
-      })
-    });
-
-    if(!pushRes.ok){
-      const err = await pushRes.json();
-      throw new Error(err.message || pushRes.statusText);
-    }
-
-    status.textContent = '✓ 已成功推送！';
-    showToast('✓ 已推送到 GitHub，約 1 分鐘後生效');
-    setTimeout(()=>{ status.textContent=''; }, 5000);
-
-  } catch(e){
-    status.textContent = '✗ 失敗：' + e.message;
-    showToast('推送失敗：' + e.message);
-  }
-}
 
 async function exportHTML(){
   showToast('準備下載中...');
 
-  // 先登出 admin 狀態，確保 DOM 是乾淨的前台
+  // 暫時切換到訪客狀態，讓 DOM 是乾淨前台
   const wasAdmin = isAdmin;
   isAdmin = false;
   applyAdminUI();
   document.getElementById('adminPanel').classList.remove('open');
   document.body.style.overflow = '';
 
-  // 等 DOM 更新
   await new Promise(r => setTimeout(r, 200));
 
-  try{
-    const res = await fetch(location.href);
-    let html = await res.text();
-    html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>/g, '');
-    const dataScript = buildDataScript();
-    html = html.replace('</head>', dataScript + '\n</head>');
-    downloadHtml(html);
-    showToast('✓ 已下載 index.html');
-  } catch(e){
-    // fallback: DOM 方式
-    let html = document.documentElement.outerHTML;
-    html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>/g, '');
-    // 清除所有 admin 狀態
-    html = html.replace(/class="admin-panel[^"]*"/g, 'class="admin-panel"');
-    html = html.replace(/class="admin-bar[^"]*"/g, 'class="admin-bar"');
-    html = html.replace(/class="admin-pill[^"]*"/g, 'class="admin-pill"');
-    html = html.replace(/class="card-admin-row[^"]*show[^"]*"/g, 'class="card-admin-row"');
-    // 隱藏所有後台按鈕
-    html = html.replace(/(id="addBtn"[^>]*)display:\s*inline-flex/g, '$1display:none');
-    html = html.replace(/(id="addUiuxBtn"[^>]*)display:\s*inline-flex/g, '$1display:none');
-    html = html.replace(/(id="saveBtn"[^>]*)display:\s*inline-flex/g, '$1display:none');
-    html = html.replace(/(id="saveBtn2"[^>]*)display:\s*inline-flex/g, '$1display:none');
-    html = html.replace(/(id="footerAdminBtn"[^>]*)display:[^;"]*/g, '$1display:none');
-    html = html.replace(/(id="footerLoginBtn"[^>]*)display:\s*none/g, '$1display:inline-flex');
-    const dataScript = buildDataScript();
-    html = html.replace('</head>', dataScript + '\n</head>');
-    downloadHtml(html);
-    showToast('✓ 已下載 index.html');
-  }
+  // 用 DOM 截取（資料都在記憶體裡）
+  let html = document.documentElement.outerHTML;
 
-  // 還原 admin 狀態（如果原本是登入的）
+  // 清除 admin 殘留
+  html = html.replace(/class="admin-panel[^"]*"/g, 'class="admin-panel"');
+  html = html.replace(/class="admin-bar[^"]*"/g, 'class="admin-bar"');
+  html = html.replace(/class="admin-pill[^"]*"/g, 'class="admin-pill"');
+  html = html.replace(/class="card-admin-row[^"]*"/g, 'class="card-admin-row"');
+  html = html.replace(/(id="addBtn"[^>]*)display:\s*inline-flex/g, '$1display:none');
+  html = html.replace(/(id="addUiuxBtn"[^>]*)display:\s*inline-flex/g, '$1display:none');
+  html = html.replace(/(id="saveBtn"(?!2)[^>]*)display:\s*inline-flex/g, '$1display:none');
+  html = html.replace(/(id="saveBtn2"[^>]*)display:\s*inline-flex/g, '$1display:none');
+  html = html.replace(/(id="footerAdminBtn"[^>]*)display:[^;>]*/g, '$1display:none');
+  html = html.replace(/(id="footerLoginBtn"[^>]*)display:\s*none/g, '$1display:inline-flex');
+
+  // 移除舊嵌入資料，加入新的
+  html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>/g, '');
+  const dataScript = buildDataScript();
+  html = html.replace('</head>', dataScript + '\n</head>');
+
+  // 下載
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'index.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('✓ 已下載 index.html');
+
+  // 還原 admin 狀態
   if(wasAdmin){
     isAdmin = true;
     applyAdminUI();
@@ -2319,16 +2237,7 @@ function buildDataScript(){
   try{localStorage.setItem('${PW_KEY}',${JSON.stringify(localStorage.getItem(PW_KEY)||DEFAULT_PW)});}catch(e){}
   try{sessionStorage.removeItem('${SESSION_KEY}');}catch(e){}
 })();
-<\/script>`;
-}
-
-function downloadHtml(html){
-  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'index.html';
-  a.click();
-  URL.revokeObjectURL(a.href);
+<\/script>\`;
 }
 
 // ─── Mobile Menu ───
