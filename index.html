@@ -819,7 +819,7 @@ footer{
 
   <!-- 平面設計 add panel -->
   <div class="upload-panel" id="addPanel">
-    <p class="panel-title">新增平面設計作品</p>
+    <p class="panel-title">新增 MY WORK 作品</p>
     <div class="form-grid">
       <div class="form-field"><label>作品名稱 *</label><input type="text" id="f-title" placeholder="My Work"></div>
       <div class="form-field"><label>類別</label>
@@ -832,12 +832,12 @@ footer{
         </select>
       </div>
       <div class="form-field full"><label>作品描述</label><textarea id="f-desc" placeholder="簡短介紹這件作品..."></textarea></div>
-      <div class="form-field full"><label>上傳圖片</label>
-        <div class="drop-zone" id="dropZone" onclick="document.getElementById('f-img').click()">
-          <small>點擊選擇圖片，或拖曳至此<br><span style="opacity:0.5">JPG / PNG / WEBP</span></small>
-          <img class="drop-preview" id="dropPreview">
+      <div class="form-field full"><label>上傳圖片（可多張）</label>
+        <div class="multi-drop-zone" id="dropZone" onclick="document.getElementById('f-img').click()">
+          <small>點擊選擇圖片，或拖曳至此<br><span style="opacity:0.5">可一次選取多張，JPG / PNG / WEBP</span></small>
+          <div class="img-preview-grid" id="graphicPreviewGrid"></div>
         </div>
-        <input type="file" id="f-img" accept="image/*" style="display:none">
+        <input type="file" id="f-img" accept="image/*" multiple style="display:none">
       </div>
     </div>
     <div class="panel-actions">
@@ -1524,8 +1524,8 @@ function compressImage(src,maxW,q,cb){
 // ─── (filters removed - works split into fixed blocks) ───
 
 // ─── Multi-image state ───
-let currentImgData = null;
-let currentImgs = [];
+let currentImgData = null;   // kept for compat, unused
+let currentGraphicImgs = []; // multi (graphic)
 
 // ─── Graphic panel toggle ───
 function toggleAddPanel(){
@@ -1537,10 +1537,9 @@ function toggleAddPanel(){
 function resetAddForm(){
   ['f-title','f-desc'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-img').value='';
-  const prev=document.getElementById('dropPreview');
-  prev.style.display='none';prev.src='';
+  document.getElementById('graphicPreviewGrid').innerHTML='';
   document.querySelector('#dropZone small').style.display='';
-  currentImgData=null;
+  currentGraphicImgs=[];
 }
 
 // ─── UIUX panel toggle ───
@@ -1560,23 +1559,42 @@ function resetUiuxForm(){
   renderFuBlocks();
 }
 
-// ─── Graphic drop zone ───
+// ─── Graphic drop zone (multi) ───
 const dz=document.getElementById('dropZone');
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
-dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)handleFile(f);});
-document.getElementById('f-img').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
-async function handleFile(file){
-  if(!file.type.startsWith('image/'))return showToast('請選擇圖片檔案');
-  showToast('上傳中...');
-  try{
-    const url = await uploadToImgBB(file);
-    currentImgData = url;
-    const p=document.getElementById('dropPreview');
-    p.src=url;p.style.display='block';
-    document.querySelector('#dropZone small').style.display='none';
-    showToast('✓ 圖片已上傳');
-  }catch(err){ showToast('上傳失敗：'+err.message); }
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');handleFiles(Array.from(e.dataTransfer.files));});
+document.getElementById('f-img').addEventListener('change',e=>{if(e.target.files.length)handleFiles(Array.from(e.target.files));});
+
+async function handleFiles(files){
+  const imgs=files.filter(f=>f.type.startsWith('image/'));
+  if(!imgs.length)return showToast('請選擇圖片檔案');
+  for(const file of imgs){
+    showToast('上傳中...');
+    try{
+      const url=await uploadToImgBB(file);
+      currentGraphicImgs.push(url);
+      renderGraphicPreview();
+      showToast('✓ 圖片已上傳');
+    }catch(err){ showToast('上傳失敗：'+err.message); }
+  }
+}
+// keep single handleFile for compat
+async function handleFile(file){ handleFiles([file]); }
+
+function renderGraphicPreview(){
+  const grid=document.getElementById('graphicPreviewGrid');
+  document.querySelector('#dropZone small').style.display=currentGraphicImgs.length?'none':'';
+  grid.innerHTML=currentGraphicImgs.map((url,i)=>`
+    <div class="img-preview-item">
+      <img src="${url}" alt="">
+      <button class="img-preview-remove" onclick="removeGraphicImg(${i})">✕</button>
+    </div>`).join('');
+}
+function removeGraphicImg(i){
+  currentGraphicImgs.splice(i,1);
+  renderGraphicPreview();
+  if(!currentGraphicImgs.length) document.querySelector('#dropZone small').style.display='';
 }
 
 // ─── UIUX cover image ───
@@ -1644,7 +1662,15 @@ function addWork(){
   if(!isAdmin)return;
   const t=document.getElementById('f-title').value.trim();
   if(!t)return showToast('請填寫作品名稱');
-  works.unshift({id:Date.now(),title:t,category:document.getElementById('f-cat').value,desc:document.getElementById('f-desc').value.trim(),img:currentImgData||null,imgs:null,blocks:null});
+  if(!currentGraphicImgs.length)return showToast('請上傳至少一張圖片');
+  works.unshift({
+    id:Date.now(),title:t,
+    category:document.getElementById('f-cat').value,
+    desc:document.getElementById('f-desc').value.trim(),
+    img:currentGraphicImgs[0],
+    imgs:currentGraphicImgs.length>1?currentGraphicImgs:null,
+    blocks:null
+  });
   try{localStorage.setItem(WORKS_KEY,JSON.stringify(works));}catch{showToast('儲存空間不足');}
   renderWorks();toggleAddPanel();showToast('作品已新增！');
 }
@@ -1717,19 +1743,16 @@ function makeCardHtml(w,multiImg){
   const hasMulti=!hasBlocks&&allImgs.length>1;
   let imgHtml;
   if(hasBlocks){
-    // blog mode: show cover image (first image block or w.img)
     const coverSrc=w.img||(w.blocks.find(b=>b.type==='image')||{}).content||null;
     imgHtml=coverSrc
-      ? `<div class="card-cover-wrap" onclick="openLightbox(${w.id})">
-           <img src="${coverSrc}" alt="${w.title}">
-           <div class="card-cover-badge">部落格</div>
-         </div>`
+      ? `<div class="card-cover-wrap" onclick="openLightbox(${w.id})"><img src="${coverSrc}" alt="${w.title}"></div>`
       : `<div class="work-img-placeholder" onclick="openLightbox(${w.id})">✦</div>`;
-  } else if(multiImg&&hasMulti){
+  } else if(hasMulti){
+    // both MY WORK and PROJECTS show cover + badge when multi
     imgHtml=`<div class="card-cover-wrap" onclick="openLightbox(${w.id})">
-         <img src="${allImgs[0]}" alt="${w.title}">
-         <div class="card-cover-badge">${allImgs.length} 張</div>
-       </div>`;
+      <img src="${allImgs[0]}" alt="${w.title}">
+      <div class="card-cover-badge">${allImgs.length} 張</div>
+    </div>`;
   } else {
     imgHtml=w.img
       ? `<img class="work-img" src="${w.img}" alt="${w.title}" onclick="openLightbox(${w.id})">`
@@ -1813,7 +1836,7 @@ function renderAdminWorks(){
       </tr>
       <tr id="edit-${w.id}" style="display:none;background:rgba(79,124,255,0.04)">
         <td colspan="4" style="padding:0.75rem 1rem">
-          <div style="display:flex;flex-direction:column;gap:0.6rem">
+          <div style="display:flex;flex-direction:column;gap:0.75rem">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
               <div style="display:flex;flex-direction:column;gap:0.3rem">
                 <label>作品名稱</label>
@@ -1830,6 +1853,27 @@ function renderAdminWorks(){
               <label>作品簡介</label>
               <textarea id="ei-desc-${w.id}" style="min-height:60px" oninput="autoSaveEdit(${w.id})">${w.desc||''}</textarea>
             </div>
+            ${w.blocks&&w.blocks.length?`
+            <div>
+              <label style="display:block;margin-bottom:0.5rem">內容區塊</label>
+              <div id="ei-blocks-${w.id}" style="display:flex;flex-direction:column;gap:0.5rem"></div>
+              <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+                <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.75rem" onclick="eiAddBlock(${w.id},'text')">＋ 文字</button>
+                <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.75rem" onclick="eiAddBlock(${w.id},'image')">＋ 圖片</button>
+              </div>
+            </div>`:
+            `<div>
+              <label style="display:block;margin-bottom:0.5rem">圖片（${(w.imgs&&w.imgs.length)||1} 張）</label>
+              <div id="ei-imgs-${w.id}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+                ${(w.imgs&&w.imgs.length?w.imgs:[w.img]).filter(Boolean).map((url,ii)=>`
+                  <div style="position:relative;width:64px;height:64px">
+                    <img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:4px;border:1px solid var(--border-hi)">
+                    <button onclick="eiRemoveImg(${w.id},${ii})" style="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--danger);border:none;color:#fff;font-size:0.6rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+                  </div>`).join('')}
+              </div>
+              <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.75rem" onclick="document.getElementById('eiAddImg-${w.id}').click()">＋ 新增圖片</button>
+              <input type="file" id="eiAddImg-${w.id}" accept="image/*" multiple style="display:none" onchange="eiUploadImgs(${w.id},this)">
+            </div>`}
             <div style="display:flex;gap:0.5rem;justify-content:flex-end;align-items:center">
               <span id="ei-status-${w.id}" style="font-size:0.7rem;color:var(--muted);font-family:'JetBrains Mono',monospace"></span>
               <button class="tbl-cancel" onclick="closeEditRow(${w.id})">關閉</button>
@@ -1840,12 +1884,86 @@ function renderAdminWorks(){
     </tbody>
   </table>`;
 }
+
 function openEditRow(id){
   document.querySelectorAll('[id^="edit-"]').forEach(r=>r.style.display='none');
   document.getElementById(`edit-${id}`).style.display='table-row';
   document.getElementById(`ei-title-${id}`).focus();
+  // render blocks editor if applicable
+  const w=works.find(x=>x.id===id);
+  if(w&&w.blocks&&w.blocks.length) renderEiBlocks(id);
 }
 function closeEditRow(id){ document.getElementById(`edit-${id}`).style.display='none'; }
+
+// ─── Blocks editor inside edit row ───
+function renderEiBlocks(id){
+  const w=works.find(x=>x.id===id); if(!w||!w.blocks) return;
+  const el=document.getElementById(`ei-blocks-${id}`); if(!el) return;
+  el.innerHTML=w.blocks.map((b,i)=>`
+    <div style="border:1px solid var(--border-hi);border-radius:5px;padding:0.6rem;background:var(--deep);display:flex;flex-direction:column;gap:0.4rem">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-family:monospace;font-size:0.62rem;color:var(--muted)">${b.type==='text'?'▤ 文字':'🖼 圖片'}</span>
+        <div style="display:flex;gap:0.35rem">
+          ${i>0?`<button onclick="eiMoveBlock(${id},${i},-1)" style="background:transparent;border:1px solid var(--border-hi);color:var(--muted);padding:1px 6px;border-radius:3px;cursor:pointer;font-size:0.7rem">↑</button>`:''}
+          ${i<w.blocks.length-1?`<button onclick="eiMoveBlock(${id},${i},1)" style="background:transparent;border:1px solid var(--border-hi);color:var(--muted);padding:1px 6px;border-radius:3px;cursor:pointer;font-size:0.7rem">↓</button>`:''}
+          <button onclick="eiRemoveBlock(${id},${i})" style="background:transparent;border:1px solid rgba(224,85,85,0.3);color:var(--danger);padding:1px 6px;border-radius:3px;cursor:pointer;font-size:0.7rem">✕</button>
+        </div>
+      </div>
+      ${b.type==='text'
+        ? `<textarea style="min-height:70px;resize:vertical" oninput="eiUpdateBlock(${id},${i},'text',this.value)">${b.content||''}</textarea>`
+        : `<div style="display:flex;flex-direction:column;gap:0.4rem">
+             ${b.content?`<img src="${b.content}" style="max-height:100px;border-radius:4px;object-fit:cover;display:block">`:''}
+             <button class="btn btn-outline" style="font-size:0.72rem;padding:0.28rem 0.7rem;align-self:flex-start" onclick="document.getElementById('eiImg-${id}-${i}').click()">${b.content?'更換圖片':'選擇圖片'}</button>
+             <input type="file" id="eiImg-${id}-${i}" accept="image/*" style="display:none" onchange="eiUploadBlockImg(${id},${i},this)">
+           </div>`}
+    </div>`).join('');
+}
+
+function eiUpdateBlock(id,i,type,val){
+  const w=works.find(x=>x.id===id); if(!w||!w.blocks) return;
+  w.blocks[i].content=val;
+  eiAutoSave(id);
+}
+function eiRemoveBlock(id,i){
+  const w=works.find(x=>x.id===id); if(!w||!w.blocks) return;
+  w.blocks.splice(i,1);
+  renderEiBlocks(id); eiAutoSave(id);
+}
+function eiMoveBlock(id,i,dir){
+  const w=works.find(x=>x.id===id); if(!w||!w.blocks) return;
+  const j=i+dir;
+  if(j<0||j>=w.blocks.length) return;
+  [w.blocks[i],w.blocks[j]]=[w.blocks[j],w.blocks[i]];
+  renderEiBlocks(id); eiAutoSave(id);
+}
+function eiAddBlock(id,type){
+  const w=works.find(x=>x.id===id); if(!w) return;
+  if(!w.blocks) w.blocks=[];
+  w.blocks.push({type,content:type==='text'?'':null});
+  renderEiBlocks(id); eiAutoSave(id);
+}
+async function eiUploadBlockImg(id,i,input){
+  const f=input.files[0]; if(!f) return;
+  showToast('上傳中...');
+  try{
+    const url=await uploadToImgBB(f);
+    const w=works.find(x=>x.id===id); if(!w||!w.blocks) return;
+    w.blocks[i].content=url;
+    renderEiBlocks(id); eiAutoSave(id);
+    showToast('✓ 圖片已上傳');
+  }catch(err){ showToast('上傳失敗：'+err.message); }
+}
+
+const _eiTimers={};
+function eiAutoSave(id){
+  clearTimeout(_eiTimers[id]);
+  _eiTimers[id]=setTimeout(()=>{
+    try{localStorage.setItem(WORKS_KEY,JSON.stringify(works));}catch{}
+    renderWorks();
+    const st=document.getElementById(`ei-status-${id}`);
+    if(st) st.textContent='✓ 已儲存';
+  },600);
+}
 
 const _editTimers={};
 function autoSaveEdit(id){
@@ -1863,8 +1981,36 @@ function autoSaveEdit(id){
     if(st){st.textContent='✓ 已儲存';}
   },600);
 }
-// keep saveEditRow as alias for backward compat
 function saveEditRow(id){ autoSaveEdit(id); }
+
+// ─── MY WORK multi-image edit ───
+function eiRemoveImg(id,ii){
+  const w=works.find(x=>x.id===id);if(!w)return;
+  const imgs=w.imgs&&w.imgs.length?w.imgs:(w.img?[w.img]:[]);
+  imgs.splice(ii,1);
+  w.img=imgs[0]||null;
+  w.imgs=imgs.length>1?imgs:null;
+  eiAutoSave(id);
+  renderAdminWorks();
+}
+async function eiUploadImgs(id,input){
+  const w=works.find(x=>x.id===id);if(!w)return;
+  const files=Array.from(input.files);
+  for(const f of files){
+    showToast('上傳中...');
+    try{
+      const url=await uploadToImgBB(f);
+      if(!w.imgs)w.imgs=w.img?[w.img]:[];
+      else if(w.img&&!w.imgs.includes(w.img))w.imgs.unshift(w.img);
+      w.imgs.push(url);
+      w.img=w.imgs[0];
+      showToast('✓ 圖片已上傳');
+    }catch(err){ showToast('上傳失敗：'+err.message); }
+  }
+  eiAutoSave(id);
+  renderAdminWorks();
+  input.value='';
+}
 
 // ─── Lightbox ───
 let lbImgs=[], lbIdx=0;
