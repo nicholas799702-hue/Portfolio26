@@ -886,7 +886,7 @@ footer{
       </div>
       <div style="display:flex;gap:0.5rem;align-items:center">
         <button class="btn btn-outline" id="addBtn" onclick="toggleAddPanel()" style="font-size:0.78rem;padding:0.35rem 0.9rem;display:none">＋ 新增</button>
-        <button id="saveBtn" onclick="exportHTML()" style="display:none;font-size:0.78rem;padding:0.35rem 0.9rem;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:'Syne',sans-serif;transition:all 0.2s" onmouseover="this.style.background='#3a6be0'" onmouseout="this.style.background='var(--accent)'">SAVE</button>
+        <button id="saveBtn" onclick="saveToLocal()" style="display:none;font-size:0.78rem;padding:0.35rem 0.9rem;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:'Syne',sans-serif;transition:all 0.2s" onmouseover="this.style.background='#3a6be0'" onmouseout="this.style.background='var(--accent)'">SAVE</button>
       </div>
     </div>
     <div class="works-grid" id="grid-graphic"></div>
@@ -903,7 +903,7 @@ footer{
       </div>
       <div style="display:flex;gap:0.5rem;align-items:center">
         <button class="btn btn-outline" id="addUiuxBtn" onclick="toggleUiuxPanel()" style="font-size:0.78rem;padding:0.35rem 0.9rem;display:none">＋ 新增</button>
-        <button id="saveBtn2" onclick="exportHTML()" style="display:none;font-size:0.78rem;padding:0.35rem 0.9rem;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:'Syne',sans-serif;transition:all 0.2s" onmouseover="this.style.background='#3a6be0'" onmouseout="this.style.background='var(--accent)'">SAVE</button>
+        <button id="saveBtn2" onclick="saveToLocal()" style="display:none;font-size:0.78rem;padding:0.35rem 0.9rem;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:'Syne',sans-serif;transition:all 0.2s" onmouseover="this.style.background='#3a6be0'" onmouseout="this.style.background='var(--accent)'">SAVE</button>
       </div>
     </div>
     <div class="works-grid" id="grid-uiux"></div>
@@ -1911,6 +1911,62 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight'&&lbImgs.length>1)lbNav(1);
 });
 
+// ─── Save to localStorage (compress images to save space) ───
+function saveToLocal(){
+  // Deep clone works and compress images for localStorage
+  function compressForStorage(dataUrl){
+    if(!dataUrl || !dataUrl.startsWith('data:image')) return dataUrl;
+    return new Promise(resolve=>{
+      const img = new Image();
+      img.onload = ()=>{
+        // max 800px wide, 0.7 quality
+        let w = img.width, h = img.height;
+        if(w > 800){ h = Math.round(h*800/w); w = 800; }
+        const c = document.createElement('canvas');
+        c.width=w; c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(c.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = ()=>resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  }
+
+  async function doSave(){
+    try{
+      // Compress works images
+      const compressedWorks = await Promise.all(works.map(async w=>{
+        const cw = {...w};
+        if(cw.img) cw.img = await compressForStorage(cw.img);
+        if(cw.imgs) cw.imgs = await Promise.all(cw.imgs.map(compressForStorage));
+        if(cw.blocks) cw.blocks = await Promise.all(cw.blocks.map(async b=>{
+          if(b.type==='image' && b.content) return {...b, content: await compressForStorage(b.content)};
+          return b;
+        }));
+        return cw;
+      }));
+
+      // Compress about photo and sections
+      const compressedAbout = {...about};
+      if(compressedAbout.photo) compressedAbout.photo = await compressForStorage(compressedAbout.photo);
+      if(compressedAbout.sections) compressedAbout.sections = await Promise.all(
+        compressedAbout.sections.map(async s=>({
+          ...s,
+          imgs: s.imgs ? await Promise.all(s.imgs.map(compressForStorage)) : []
+        }))
+      );
+
+      localStorage.setItem(WORKS_KEY, JSON.stringify(compressedWorks));
+      localStorage.setItem(ABOUT_KEY, JSON.stringify(compressedAbout));
+      localStorage.setItem(HERO_KEY,  JSON.stringify(hero));
+      showToast('✓ 已暫存（圖片已壓縮）');
+    } catch(e){
+      showToast('儲存失敗：' + e.message);
+    }
+  }
+  doSave();
+}
+
 // ─── Export HTML for GitHub Pages ───
 function exportHTML(){
   // Get current HTML
@@ -2019,31 +2075,26 @@ init();
   // Atmosphere glow
   var atmGeo = new THREE.SphereGeometry(1.06, 64, 64);
   var atmMat = new THREE.MeshPhongMaterial({
-    color: 0x2255cc,
-    transparent: true,
-    opacity: 0.08,
-    side: THREE.BackSide
+    color: 0x2255cc, transparent: true, opacity: 0.08, side: THREE.BackSide
   });
   scene.add(new THREE.Mesh(atmGeo, atmMat));
 
   // ── earth_01：白天大氣版 ──
   var earth_01 = {
-    map:    'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_atmos_2048.jpg',
-    spec:   'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_specular_2048.jpg',
-    normal: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_normal_2048.jpg',
-    cloud:  'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_clouds_1024.png',
+    map:    BASE + 'earth_atmos_2048.jpg',
+    spec:   BASE + 'earth_specular_2048.jpg',
+    normal: BASE + 'earth_normal_2048.jpg',
+    cloud:  BASE + 'earth_clouds_1024.png',
   };
 
   // 使用 earth_01
-  loader.load(earth_01.map, function(t){ mat.map = t; mat.needsUpdate = true; });
-  loader.load(earth_01.spec, function(t){ mat.specularMap = t; mat.specular = new THREE.Color(0x446688); mat.needsUpdate = true; });
+  loader.load(earth_01.map,    function(t){ mat.map = t; mat.needsUpdate = true; });
+  loader.load(earth_01.spec,   function(t){ mat.specularMap = t; mat.specular = new THREE.Color(0x446688); mat.needsUpdate = true; });
   loader.load(earth_01.normal, function(t){ mat.normalMap = t; mat.normalScale = new THREE.Vector2(0.5, 0.5); mat.needsUpdate = true; });
-  loader.load(earth_01.cloud, function(t){ cloudMat.map = t; cloudMat.alphaMap = t; cloudMat.opacity = 0.42; cloudMat.needsUpdate = true; });
+  loader.load(earth_01.cloud,  function(t){ cloudMat.map = t; cloudMat.alphaMap = t; cloudMat.opacity = 0.42; cloudMat.needsUpdate = true; });
 
   // Handle canvas resize
-  window.addEventListener('resize', function(){
-    // canvas stays fixed 600x600, nothing to resize
-  });
+  window.addEventListener('resize', function(){});
 
   function animate(){
     requestAnimationFrame(animate);
