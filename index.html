@@ -1073,6 +1073,20 @@ footer{
       </div>
     </div>
 
+    <!-- 匯出 HTML -->
+    <div class="ap-section">
+      <div class="ap-section-head">
+        <span class="ap-section-title">部署 GitHub Pages</span>
+      </div>
+      <div class="ap-section-body">
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem">將所有作品、關於我、首頁資料嵌入 HTML 並下載，上傳至 GitHub 即可部署。</p>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1.25rem;font-family:'JetBrains Mono',monospace;letter-spacing:0.03em">流程：下載 → 覆蓋本機 HTML → 推上 GitHub</p>
+        <button class="btn btn-primary" style="font-size:0.85rem;gap:0.6rem" onclick="exportHTML()">
+          ↓ 下載更新後的 HTML
+        </button>
+      </div>
+    </div>
+
     <!-- 退出後台 -->
     <div style="display:flex;gap:1rem;justify-content:flex-end;padding:1rem 0 2rem">
       <button class="btn btn-outline" style="font-size:0.85rem;padding:0.6rem 1.5rem" onclick="logout()">登出帳號</button>
@@ -1888,6 +1902,41 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowLeft'&&lbImgs.length>1)lbNav(-1);
   if(e.key==='ArrowRight'&&lbImgs.length>1)lbNav(1);
 });
+
+// ─── Export HTML for GitHub Pages ───
+function exportHTML(){
+  // Get current HTML
+  let html = document.documentElement.outerHTML;
+
+  // Build the data injection script
+  const dataScript = `<script id="__embedded_data__">
+(function(){
+  var _w=${JSON.stringify(works)};
+  var _a=${JSON.stringify(about)};
+  var _h=${JSON.stringify(hero)};
+  var _p=${JSON.stringify(localStorage.getItem(PW_KEY)||DEFAULT_PW)};
+  try{localStorage.setItem('${WORKS_KEY}',JSON.stringify(_w));}catch(e){}
+  try{localStorage.setItem('${ABOUT_KEY}',JSON.stringify(_a));}catch(e){}
+  try{localStorage.setItem('${HERO_KEY}',JSON.stringify(_h));}catch(e){}
+  try{localStorage.setItem('${PW_KEY}',_p);}catch(e){}
+})();
+<\/script>`;
+
+  // Remove any existing embedded data script to avoid duplication
+  html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>/g, '');
+
+  // Inject before </head>
+  html = html.replace('</head>', dataScript + '\n</head>');
+
+  // Download
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'index.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('✓ 已下載 index.html，上傳至 GitHub 即可部署');
+}
 
 // ─── Mobile Menu ───
 function toggleMobileMenu(){
