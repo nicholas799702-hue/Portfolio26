@@ -1065,7 +1065,10 @@ footer{
     <div class="ap-section">
       <div class="ap-section-head">
         <span class="ap-section-title">作品管理</span>
-        <button class="btn btn-primary" style="font-size:0.78rem;padding:0.35rem 0.9rem" onclick="closeAdminPanel();setTimeout(()=>{goTo('works');toggleAddPanel()},300)">＋ 新增作品</button>
+        <div style="display:flex;gap:0.5rem">
+          <button class="btn btn-outline" style="font-size:0.78rem;padding:0.35rem 0.9rem" onclick="closeAdminPanel();setTimeout(()=>{goTo('works');toggleAddPanel()},300)">＋ MY WORK</button>
+          <button class="btn btn-primary" style="font-size:0.78rem;padding:0.35rem 0.9rem" onclick="closeAdminPanel();setTimeout(()=>{goTo('works');toggleUiuxPanel()},300)">＋ PROJECTS</button>
+        </div>
       </div>
       <div class="ap-section-body" style="padding:0"><div id="apWorksList"></div></div>
     </div>
@@ -2243,17 +2246,24 @@ async function exportHTML(){
     + headHTML + '\n</head>\n<body>\n'
     + bodyHTML + '\n</body>\n</html>';
 
-  // 清除殘留 admin class
-  html = html.replace(/class="admin-panel open"/g, 'class="admin-panel"');
-  html = html.replace(/class="admin-bar show"/g, 'class="admin-bar"');
-  html = html.replace(/class="admin-pill show"/g, 'class="admin-pill"');
-  html = html.replace(/class="card-admin-row show"/g, 'class="card-admin-row"');
+  // 清除殘留 admin class（用 RegExp 字串建構，避免匯出後 regex 字面量被截斷）
+  html = html.replace(new RegExp('class="admin-panel open"','g'), 'class="admin-panel"');
+  html = html.replace(new RegExp('class="admin-bar show"','g'), 'class="admin-bar"');
+  html = html.replace(new RegExp('class="admin-pill show"','g'), 'class="admin-pill"');
+  html = html.replace(new RegExp('class="card-admin-row show"','g'), 'class="card-admin-row"');
 
   // 移除舊嵌入資料
-  html = html.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>\n?/g, '');
+  var EMBED_TAG = '__embedded_data__';
+  var startMark = '<scr'+'ipt id="'+EMBED_TAG+'">';
+  var endMark = '<\/scr'+'ipt>';
+  var si = html.indexOf(startMark);
+  if(si !== -1){
+    var ei = html.indexOf(endMark, si);
+    if(ei !== -1) html = html.slice(0, si) + html.slice(ei + endMark.length);
+  }
 
   // 嵌入資料（插在主 script 之前）
-  const dataScript = '<scr'+'ipt id="__embedded_data__">\n'
+  const dataScript = '<scr'+'ipt id="'+EMBED_TAG+'">\n'
     +'(function(){\n'
     +'try{localStorage.setItem("'+WORKS_KEY+'",'+JSON.stringify(worksRaw)+');}catch(e){}\n'
     +'try{localStorage.setItem("'+ABOUT_KEY+'",'+JSON.stringify(aboutRaw)+');}catch(e){}\n'
@@ -2261,8 +2271,9 @@ async function exportHTML(){
     +'try{localStorage.setItem("'+PW_KEY+'",'+JSON.stringify(pwRaw)+');}catch(e){}\n'
     +'try{sessionStorage.removeItem("'+SESSION_KEY+'");}catch(e){}\n'
     +'})();\n'
-    +'<\/scr'+'ipt>';
-  html = html.replace('<script>\n// ─── Keys ───', dataScript+'\n<script>\n// ─── Keys ───');
+    +endMark;
+  var keysMark = '<scr'+'ipt>\n// ─── Keys ───';
+  html = html.replace(keysMark, dataScript+'\n'+keysMark);
 
   // 下載
   const blob = new Blob([html],{type:'text/html;charset=utf-8'});
