@@ -2205,9 +2205,7 @@ function saveToLocal(){
 }
 
 // ─── Export HTML ───
-async function exportHTML(){
-  showToast('準備下載中...');
-
+function exportHTML(){
   // 同步資料到 localStorage
   try{localStorage.setItem(WORKS_KEY,JSON.stringify(works));}catch{}
   try{localStorage.setItem(ABOUT_KEY,JSON.stringify(about));}catch{}
@@ -2224,7 +2222,6 @@ async function exportHTML(){
   renderWorks();
   document.getElementById('adminPanel').classList.remove('open');
   document.body.style.overflow = '';
-  await new Promise(r => setTimeout(r, 80));
 
   // 移除 terrain 動態 canvas
   const dynamicCanvases = [];
@@ -2233,7 +2230,7 @@ async function exportHTML(){
     el.remove();
   });
 
-  // 用 head/body 分別序列化，避免 outerHTML 截掉 script 結尾
+  // 用 head/body 分別序列化
   const headHTML = document.head.innerHTML;
   const bodyHTML = document.body.innerHTML;
 
@@ -2282,7 +2279,6 @@ async function exportHTML(){
   a.download = 'outhtml.html';
   a.click();
   URL.revokeObjectURL(a.href);
-  showToast('✓ 已下載 outhtml.html');
 }
 
 function buildDataScript(){}
