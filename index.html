@@ -1099,7 +1099,10 @@ footer{
       </div>
       <div class="ap-section-body">
         <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem">下載 <strong>outhtml</strong>，上傳至 GitHub 即可部署。所有作品資料都已嵌入。</p>
-        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1.25rem;font-family:'JetBrains Mono',monospace">流程：下載 → 改名 index.html → 上傳 GitHub</p>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:1rem;font-family:'JetBrains Mono',monospace">流程：下載 → 改名 index.html → 上傳 GitHub</p>
+        <div id="lastSavedBox" style="font-size:0.78rem;color:var(--muted);margin-bottom:1.25rem;font-family:'JetBrains Mono',monospace;padding:0.6rem 0.85rem;background:var(--deep);border:1px solid var(--border);border-radius:5px">
+          最後更新：<span id="lastSavedTime" style="color:var(--accent)">尚未儲存</span>
+        </div>
         <button class="btn btn-primary" style="font-size:0.85rem" onclick="exportHTML()">
           ↓ 下載 outhtml
         </button>
@@ -1121,7 +1124,24 @@ footer{
 // ─── Keys ───
 const WORKS_KEY='portfolio_works_v1',PW_KEY='portfolio_admin_pw',
       ABOUT_KEY='portfolio_about_v2',HERO_KEY='portfolio_hero_v1',
-      SESSION_KEY='portfolio_admin_session',DEFAULT_PW='7788A';
+      SESSION_KEY='portfolio_admin_session',DEFAULT_PW='7788A',
+      LAST_SAVED_KEY='portfolio_last_saved';
+
+// 統一的儲存記錄函式
+function markSaved(){
+  const now=new Date();
+  const stamp=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+  try{localStorage.setItem(LAST_SAVED_KEY,stamp);}catch{}
+  const el=document.getElementById('lastSavedTime');
+  if(el) el.textContent=stamp;
+}
+function refreshLastSaved(){
+  const el=document.getElementById('lastSavedTime');
+  if(el){
+    const t=localStorage.getItem(LAST_SAVED_KEY);
+    el.textContent=t||'尚未儲存';
+  }
+}
 
 let works=[],isAdmin=false,about={},hero={},currentFilter='all';
 
@@ -1329,7 +1349,7 @@ function removeSecImg(si,ii){
 }
 function saveAboutSections(){
   try{localStorage.setItem(ABOUT_KEY,JSON.stringify(about));}catch{}
-  showToast('✓ 區塊已儲存');
+  markSaved();showToast('✓ 區塊已儲存');
 }
 function applyAdminUI(){
   document.getElementById('adminBar').classList.toggle('show',isAdmin);
@@ -1404,6 +1424,7 @@ function openAdminPanel(){
   const pp=document.getElementById('apPhotoPreview');
   pp.innerHTML=about.photo?`<img src="${about.photo}">`:'🙂';
   renderAdminWorks();
+  refreshLastSaved();
   // attach auto-save listeners (once each)
   attachAutoSave();
   document.getElementById('adminPanel').classList.add('open');
@@ -1451,7 +1472,7 @@ function saveHero(){
   hero.files=document.getElementById('apHeroFiles').value.trim()||HERO_DEF.files;
   try{localStorage.setItem(HERO_KEY,JSON.stringify(hero));}catch{}
   applyHero();
-  showToast('✓ 首頁已儲存');
+  markSaved();showToast('✓ 首頁已儲存');
 }
 
 // ─── Save About (silent auto-save) ───
@@ -1463,7 +1484,7 @@ function saveAbout(){
   about.skills=document.getElementById('apSkills').value.trim()||ABOUT_DEF.skills;
   try{localStorage.setItem(ABOUT_KEY,JSON.stringify(about));}catch{}
   applyAbout();
-  showToast('✓ 關於我已儲存');
+  markSaved();showToast('✓ 關於我已儲存');
 }
 
 // ─── Photo (auto-save on upload) ───
@@ -1689,7 +1710,7 @@ function addWork(){
     blocks:null
   });
   try{localStorage.setItem(WORKS_KEY,JSON.stringify(works));}catch{showToast('儲存空間不足');}
-  renderWorks();toggleAddPanel();showToast('作品已新增！');
+  renderWorks();toggleAddPanel();markSaved();showToast('作品已新增！');
 }
 
 // ─── Add UIUX work (blog-mode blocks) ───
@@ -1710,7 +1731,7 @@ function addUiuxWork(){
   });
   try{localStorage.setItem(WORKS_KEY,JSON.stringify(works));}catch{showToast('儲存空間不足');}
   currentUiuxCover=null;
-  renderWorks();toggleUiuxPanel();showToast('作品已新增！');
+  renderWorks();toggleUiuxPanel();markSaved();showToast('作品已新增！');
 }
 
 // ─── Delete ───
@@ -1722,7 +1743,7 @@ function deleteWork(id){
   if(document.getElementById('allWorksPage').style.display!=='none'){
     renderAllWorksGrid();
   }
-  showToast('已刪除');
+  markSaved();showToast('已刪除');
 }
 
 // ─── Render works (two fixed blocks) ───
@@ -2028,7 +2049,7 @@ function autoSaveEdit(id){
       if(cells[2]) cells[2].style.color='var(--muted)', cells[2].textContent=w.category;
     }
     const st=document.getElementById(`ei-status-${id}`);
-    if(st){ st.textContent='✓ 已儲存'; setTimeout(()=>{ if(st) st.textContent=''; },2000); }
+    if(st){ st.textContent='✓ 已儲存'; markSaved(); setTimeout(()=>{ if(st) st.textContent=''; },2000); }
   },600);
 }
 function saveEditRow(id){ autoSaveEdit(id); }
@@ -2206,7 +2227,7 @@ function saveToLocal(){
       localStorage.setItem(WORKS_KEY, JSON.stringify(compressedWorks));
       localStorage.setItem(ABOUT_KEY, JSON.stringify(compressedAbout));
       localStorage.setItem(HERO_KEY,  JSON.stringify(hero));
-      showToast('✓ 已暫存（圖片已壓縮）');
+      markSaved();showToast('✓ 已暫存（圖片已壓縮）');
     } catch(e){
       showToast('儲存失敗：' + e.message);
     }
