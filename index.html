@@ -129,10 +129,11 @@ section:not(:first-child){padding-top:5rem}
 }
 
 .folder-wrap{
-  width:calc(100% - 496px);
-  min-width:480px;
+  width:calc(100% - 413px);
+  min-width:576px;
   opacity:0;animation:riseIn 0.8s 0.2s cubic-bezier(.22,1,.36,1) forwards;
   position:relative;z-index:1;
+  margin-top:32pt;
 }
 @keyframes riseIn{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
 
@@ -177,7 +178,7 @@ section:not(:first-child){padding-top:5rem}
 }
 .folder-path span{color:var(--accent)}
 .folder-name{
-  font-size:clamp(2.4rem,8cqi,4.8rem);font-weight:800;
+  font-size:clamp(2.88rem,9.6cqi,5.76rem);font-weight:800;
   line-height:1.0;letter-spacing:-0.02em;
   color:var(--text);margin-bottom:1rem;
   padding-left:24px;padding-right:24px;
@@ -312,6 +313,13 @@ section:not(:first-child){padding-top:5rem}
   background:linear-gradient(135deg,var(--panel),var(--dim));
   display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:2rem;cursor:pointer;
 }
+
+/* PROJECTS 卡片：兩列，467×293px，間距 24px */
+#block-uiux .works-grid{gap:24px;justify-content:center}
+#block-uiux .work-card{width:467px}
+#block-uiux .card-cover-wrap img{width:467px;height:247px}
+#block-uiux .work-img{width:467px;height:247px}
+#block-uiux .work-img-placeholder{width:467px;height:247px}
 .work-info{padding:1rem 1.1rem 1.1rem}
 .work-category{
   font-family:'JetBrains Mono',monospace;font-size:0.62rem;
@@ -319,6 +327,11 @@ section:not(:first-child){padding-top:5rem}
 }
 .work-title{font-weight:600;font-size:0.9rem;color:#fff;margin-bottom:0.25rem}
 .work-desc{font-size:0.78rem;color:var(--muted);line-height:1.55;display:none}
+
+/* MY WORK：隱藏名稱與類別，點 popup 才看到 */
+#block-graphic .work-title{display:none}
+#block-graphic .work-category{display:none}
+#block-graphic .work-info{padding:0}
 .card-admin-row{display:none;gap:0.5rem;margin-top:0.75rem}
 .card-admin-row.show{display:flex}
 .card-btn{
@@ -913,8 +926,8 @@ footer{
 <footer>
   <div>© NINA Portfolio &nbsp;·&nbsp; All rights reserved</div>
   <div style="margin-top:0.5rem;display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap">
-    <button class="footer-admin-btn" onclick="openLogin()" id="footerLoginBtn">🔑 Backend</button>
-    <button class="footer-admin-btn" onclick="openAdminPanel()" id="footerAdminBtn" style="display:none">⚙ Dashboard</button>
+    <button class="footer-admin-btn" onclick="openLogin()" id="footerLoginBtn">Backend</button>
+    <button class="footer-admin-btn" onclick="openAdminPanel()" id="footerAdminBtn" style="display:none">Dashboard</button>
     <button class="footer-admin-btn" onclick="logout()" id="footerLogoutBtn" style="display:none;color:var(--danger);border-color:rgba(224,85,85,0.3)">登出</button>
   </div>
 </footer>
@@ -1008,9 +1021,6 @@ footer{
         <div class="ap-form-row">
           <div class="form-field"><label>Location 欄位</label><input type="text" id="apHeroLocation" placeholder="Taiwan"></div>
           <div class="form-field"><label>資料夾快捷鍵（逗號分隔，格式: 圖示 名稱）</label><input type="text" id="apHeroFiles" placeholder="📄 about_me.md, 🗂 works/"></div>
-        </div>
-        <div class="ap-form-row single">
-          <div class="form-field"><label>描述文字</label><textarea id="apHeroDesc"></textarea></div>
         </div>
       </div>
     </div>
@@ -1383,7 +1393,7 @@ function openAdminPanel(){
   document.getElementById('apHeroName').value=hero.name;
   document.getElementById('apHeroRole').value=hero.role;
   document.getElementById('apHeroLocation').value=hero.location;
-  document.getElementById('apHeroDesc').value=hero.desc;
+  document.getElementById('apHeroDesc') && (document.getElementById('apHeroDesc').value=hero.desc||'');
   document.getElementById('apHeroFiles').value=hero.files;
   document.getElementById('apTitle').value=about.title.replace(/\\n/g,'\n');
   document.getElementById('apBodyShort').value=about.bodyShort||'';
@@ -1405,7 +1415,7 @@ function attachAutoSave(){
   if(_autoSaveAttached)return;
   _autoSaveAttached=true;
   // hero fields
-  ['apHeroName','apHeroRole','apHeroLocation','apHeroDesc','apHeroFiles'].forEach(id=>{
+  ['apHeroName','apHeroRole','apHeroLocation','apHeroFiles'].forEach(id=>{
     document.getElementById(id).addEventListener('input',debounce(saveHero,600));
   });
   // about fields
@@ -1437,7 +1447,7 @@ function saveHero(){
   hero.name=document.getElementById('apHeroName').value.trim()||HERO_DEF.name;
   hero.role=document.getElementById('apHeroRole').value.trim()||HERO_DEF.role;
   hero.location=document.getElementById('apHeroLocation').value.trim()||HERO_DEF.location;
-  hero.desc=document.getElementById('apHeroDesc').value.trim()||HERO_DEF.desc;
+  hero.desc=HERO_DEF.desc;
   hero.files=document.getElementById('apHeroFiles').value.trim()||HERO_DEF.files;
   try{localStorage.setItem(HERO_KEY,JSON.stringify(hero));}catch{}
   applyHero();
